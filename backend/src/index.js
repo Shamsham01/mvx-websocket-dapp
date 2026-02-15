@@ -108,6 +108,8 @@ async function gracefulShutdown() {
 // Initialize and start server
 async function startServer() {
   try {
+    // Ensure database tables are created
+    await database.ensureInitialized();
     // Test database connection
     await database.get('SELECT 1 as test');
     logger.info('Database connection established');
