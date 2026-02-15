@@ -7,7 +7,7 @@ class Database {
     this.dbPath = process.env.DB_PATH || './data/subscriptions.db';
     this.ensureDataDirectory();
     this.db = new sqlite3.Database(this.dbPath);
-    this.initializeDatabase();
+    this._initPromise = this.initializeDatabase();
   }
 
   ensureDataDirectory() {
@@ -17,9 +17,20 @@ class Database {
     }
   }
 
+  async ensureInitialized() {
+    return this._initPromise;
+  }
+
   initializeDatabase() {
-    // Create users table
-    this.db.run(`
+    return new Promise((resolve, reject) => {
+      const run = (sql) => new Promise((res, rej) => {
+        this.db.run(sql, (err) => err ? rej(err) : res());
+      });
+
+      (async () => {
+        try {
+          // Create users table
+          await run(`
       CREATE TABLE IF NOT EXISTS users (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         address TEXT UNIQUE NOT NULL,
@@ -28,8 +39,8 @@ class Database {
       )
     `);
 
-    // Create subscriptions table
-    this.db.run(`
+          // Create subscriptions table
+          await run(`
       CREATE TABLE IF NOT EXISTS subscriptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -44,8 +55,8 @@ class Database {
       )
     `);
 
-    // Create webhook_logs table for tracking deliveries
-    this.db.run(`
+          // Create webhook_logs table for tracking deliveries
+          await run(`
       CREATE TABLE IF NOT EXISTS webhook_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         subscription_id INTEGER NOT NULL,
@@ -59,11 +70,17 @@ class Database {
       )
     `);
 
-    // Create indexes
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_users_address ON users(address)');
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id)');
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active)');
-    this.db.run('CREATE INDEX IF NOT EXISTS idx_webhook_logs_subscription_id ON webhook_logs(subscription_id)');
+          // Create indexes
+          await run('CREATE INDEX IF NOT EXISTS idx_users_address ON users(address)');
+          await run('CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id)');
+          await run('CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active)');
+          await run('CREATE INDEX IF NOT EXISTS idx_webhook_logs_subscription_id ON webhook_logs(subscription_id)');
+          resolve();
+        } catch (err) {
+          reject(err);
+        }
+      })();
+    });
   }
 
   query(sql, params = []) {
