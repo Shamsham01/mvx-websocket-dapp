@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: mvx-websocket-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_PATH=/app/data/subscriptions.db
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - MVX_API_MAINNET=https://api.multiversx.com
+      - MVX_API_TESTNET=https://testnet-api.multiversx.com
+      - MVX_API_DEVNET=https://devnet-api.multiversx.com
+      - WEBHOOK_TIMEOUT_MS=10000
+      - WEBHOOK_MAX_RETRIES=3
+      - LOG_LEVEL=info
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/logs:/app/logs
+    networks:
+      - mvx-network
+
+  frontend:
+    build: ./frontend
+    container_name: mvx-websocket-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001/api
+      - REACT_APP_ENV=production
+    depends_on:
+      - backend
+    networks:
+      - mvx-network
+
+networks:
+  mvx-network:
+    driver: bridge
