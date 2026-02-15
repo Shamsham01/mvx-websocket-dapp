@@ -51,9 +51,30 @@ NODE_ENV=development
 # Database
 DB_PATH=./data/subscriptions.db
 
-# Security
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+# Security - GENERATE A SECURE JWT SECRET!
+JWT_SECRET=your-generated-jwt-secret-here  # See below for generation
 JWT_EXPIRES_IN=7d
+
+### Generating JWT Secret:
+```bash
+# Method 1: OpenSSL (recommended)
+openssl rand -hex 32
+
+# Method 2: Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Method 3: Python
+python3 -c "import secrets; print(secrets.token_hex(32))"
+
+# Method 4: Use the provided script
+./scripts/generate-env.sh
+```
+
+### Quick Setup with Auto-generated Secret:
+```bash
+cd mvx-websocket-dapp
+./scripts/setup.sh  # Auto-generates JWT secret if openssl is available
+```
 
 # MultiversX API
 MVX_API_MAINNET=https://api.multiversx.com
