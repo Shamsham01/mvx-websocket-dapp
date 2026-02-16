@@ -1,0 +1,8 @@
+# Netlify config for mvx-websocket-dapp frontend
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "build"
+
+# Environment variable - set REACT_APP_API_URL in Netlify UI
+# REACT_APP_API_URL = "https://mvx-websocket-dapp.onrender.com/api"
