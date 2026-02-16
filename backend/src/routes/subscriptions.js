@@ -112,7 +112,7 @@ router.post('/', authenticate, async (req, res) => {
     // Create subscription in database
     const result = await database.run(`
       INSERT INTO subscriptions (user_id, name, webhook_url, filters, network, is_active)
-      VALUES (?, ?, ?, ?, ?, 1)
+      VALUES (?, ?, ?, ?, ?, true)
     `, [
       req.user.id,
       name,
@@ -123,25 +123,30 @@ router.post('/', authenticate, async (req, res) => {
 
     const subscriptionId = result.id;
 
-    // Create WebSocket subscription
+    // Create WebSocket subscription (non-blocking: keep subscription even if WebSocket fails)
+    let websocketError = null;
     try {
       await websocketService.createSubscription(subscriptionId, filters, network);
-      
-      const subscription = await database.get('SELECT * FROM subscriptions WHERE id = ?', [subscriptionId]);
-      
-      res.status(201).json({
-        success: true,
-        message: 'Subscription created successfully',
-        subscription: {
-          ...subscription,
-          filters: parseJson(subscription.filters)
-        }
-      });
-    } catch (websocketError) {
-      // If WebSocket fails, delete the database entry
-      await database.run('DELETE FROM subscriptions WHERE id = ?', [subscriptionId]);
-      throw websocketError;
+    } catch (err) {
+      logger.error('WebSocket subscription failed (subscription saved as inactive):', err.message);
+      websocketError = err;
+      // Mark as inactive instead of deleting - user can retry via toggle
+      await database.run('UPDATE subscriptions SET is_active = false WHERE id = ?', [subscriptionId]);
     }
+
+    const subscription = await database.get('SELECT * FROM subscriptions WHERE id = ?', [subscriptionId]);
+
+    res.status(201).json({
+      success: true,
+      message: websocketError
+        ? 'Subscription created but WebSocket connection failed. You can try activating it from the subscriptions list.'
+        : 'Subscription created successfully',
+      subscription: {
+        ...subscription,
+        filters: parseJson(subscription.filters)
+      },
+      ...(websocketError && { warning: websocketError.message })
+    });
   } catch (error) {
     logger.error('Create subscription error:', error);
     res.status(500).json({ 
@@ -172,7 +177,7 @@ router.put('/:id', authenticate, async (req, res) => {
       webhook_url: webhook_url !== undefined ? webhook_url : existing.webhook_url,
       filters: filters !== undefined ? JSON.stringify(filters) : existing.filters,
       network: network !== undefined ? network : existing.network,
-      is_active: is_active !== undefined ? (is_active ? 1 : 0) : existing.is_active,
+      is_active: is_active !== undefined ? !!is_active : existing.is_active,
       updated_at: new Date().toISOString()
     };
 
@@ -299,7 +304,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
     // Update active status
     await database.run(
       'UPDATE subscriptions SET is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-      [is_active ? 1 : 0, req.params.id]
+      [!!is_active, req.params.id]
     );
 
     // Update WebSocket subscription

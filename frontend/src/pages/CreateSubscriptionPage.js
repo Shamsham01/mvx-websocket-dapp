@@ -70,7 +70,8 @@ export default function CreateSubscriptionPage() {
       }
       navigate('/subscriptions');
     } catch (err) {
-      setError(err?.error || err?.message || 'Failed to save');
+      const msg = err?.details || err?.error || err?.message || 'Failed to save';
+      setError(msg);
     } finally {
       setSaving(false);
     }
