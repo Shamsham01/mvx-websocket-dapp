@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography, Button, CircularProgress, Grid, Card, CardContent } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, Grid, Card, CardContent } from '@mui/material';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
