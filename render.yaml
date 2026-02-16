@@ -1,0 +1,42 @@
+# Render Blueprint - mvx-websocket-dapp backend
+# Use this for Infrastructure-as-Code deployment
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: mvx-websocket-backend
+    runtime: node
+    # Backend is in a subfolder
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DB_PATH
+        value: ./data/subscriptions.db
+      - key: PORT
+        value: 3001
+      - key: JWT_EXPIRES_IN
+        value: 365d
+      - key: MVX_API_MAINNET
+        value: https://api.multiversx.com
+      - key: MVX_API_TESTNET
+        value: https://testnet-api.multiversx.com
+      - key: MVX_API_DEVNET
+        value: https://devnet-api.multiversx.com
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 100
+      - key: WEBHOOK_TIMEOUT_MS
+        value: 10000
+      - key: WEBHOOK_MAX_RETRIES
+        value: 3
+      - key: LOG_LEVEL
+        value: info
+
+# Add these as "secret" environment variables in Render Dashboard:
+# - JWT_SECRET (required)
+# - FRONTEND_URL (your Netlify URL, for CORS)
