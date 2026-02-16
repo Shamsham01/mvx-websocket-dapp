@@ -137,7 +137,7 @@ async function initializeActiveSubscriptions() {
       SELECT s.*, u.address as user_address 
       FROM subscriptions s
       JOIN users u ON s.user_id = u.id
-      WHERE s.is_active = 1
+      WHERE s.is_active = true
     `);
 
     logger.info(`Found ${activeSubscriptions.length} active subscriptions to initialize`);

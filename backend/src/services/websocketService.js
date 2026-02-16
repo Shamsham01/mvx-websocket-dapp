@@ -160,7 +160,7 @@ class WebSocketService {
         SELECT s.*, u.address as user_address 
         FROM subscriptions s
         JOIN users u ON s.user_id = u.id
-        WHERE s.network = ? AND s.is_active = 1
+        WHERE s.network = ? AND s.is_active = true
       `, [network]);
 
       if (subscriptions.length === 0) {
