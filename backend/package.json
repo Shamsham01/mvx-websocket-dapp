@@ -27,7 +27,13 @@
     "nodemon": "^3.0.1",
     "supertest": "^6.3.3"
   },
-  "keywords": ["multiversx", "websocket", "blockchain", "subscription", "webhook"],
+  "keywords": [
+    "multiversx",
+    "websocket",
+    "blockchain",
+    "subscription",
+    "webhook"
+  ],
   "author": "ClawB",
   "license": "MIT"
 }
