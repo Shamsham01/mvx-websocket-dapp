@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const database = require('../config/database');
+const { parseJson } = require('../utils/parseJson');
 const webhookService = require('../services/webhookService');
 const logger = require('../utils/logger');
 
@@ -178,7 +179,7 @@ router.get('/deliveries', authenticate, async (req, res) => {
       success: true,
       deliveries: deliveries.map(d => ({
         ...d,
-        transfer_data: JSON.parse(d.transfer_data)
+        transfer_data: parseJson(d.transfer_data)
       })),
       pagination: {
         total: total?.count || 0,

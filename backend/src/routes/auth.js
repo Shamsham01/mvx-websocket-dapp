@@ -100,7 +100,7 @@ router.get('/me', authenticate, async (req, res) => {
     const subscriptionStats = await database.get(`
       SELECT 
         COUNT(*) as total_subscriptions,
-        SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active_subscriptions
+        COALESCE(SUM(CASE WHEN is_active THEN 1 ELSE 0 END), 0) as active_subscriptions
       FROM subscriptions 
       WHERE user_id = ?
     `, [user.id]);
