@@ -1,0 +1,26 @@
+# Render Blueprint - mvx-websocket-dapp backend
+# Use this for Infrastructure-as-Code deployment
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: mvx-websocket-backend
+    runtime: node
+
+    # Backend is in a subfolder
+    rootDir: backend
+
+    buildCommand: npm install
+    startCommand: npm start
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Link a PostgreSQL database to auto-inject DATABASE_URL
+      # Add these as "secret" environment variables in Render Dashboard:
+      # - DATABASE_URL (or link PostgreSQL - injected automatically)
+      # - JWT_SECRET (required)
+      # - FRONTEND_URL (your Netlify URL, for CORS)
+      # - JWT_EXPIRES_IN, MVX_API_MAINNET, etc. (or use defaults)

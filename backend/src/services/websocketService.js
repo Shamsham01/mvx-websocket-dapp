@@ -1,6 +1,7 @@
 const { io } = require('socket.io-client');
 const axios = require('axios');
 const logger = require('../utils/logger');
+const { parseJson } = require('../utils/parseJson');
 const database = require('../config/database');
 const webhookService = require('./webhookService');
 
@@ -169,7 +170,7 @@ class WebSocketService {
       // Process each transfer for each subscription
       for (const transfer of data.transfers) {
         for (const subscription of subscriptions) {
-          if (this.matchesFilters(transfer, JSON.parse(subscription.filters))) {
+          if (this.matchesFilters(transfer, parseJson(subscription.filters))) {
             await webhookService.deliverWebhook(subscription, transfer);
           }
         }

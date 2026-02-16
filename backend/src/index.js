@@ -146,7 +146,7 @@ async function initializeActiveSubscriptions() {
       try {
         await websocketService.createSubscription(
           subscription.id,
-          JSON.parse(subscription.filters),
+          require('./utils/parseJson').parseJson(subscription.filters),
           subscription.network
         );
         logger.info(`Initialized subscription ${subscription.id} for user ${subscription.user_address}`);

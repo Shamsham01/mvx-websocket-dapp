@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const database = require('../config/database');
+const { parseJson } = require('../utils/parseJson');
 const websocketService = require('../services/websocketService');
 const webhookService = require('../services/webhookService');
 const logger = require('../utils/logger');
@@ -43,7 +44,7 @@ router.get('/', authenticate, async (req, res) => {
       success: true,
       subscriptions: subscriptions.map(sub => ({
         ...sub,
-        filters: JSON.parse(sub.filters)
+        filters: parseJson(sub.filters)
       }))
     });
   } catch (error) {
@@ -68,7 +69,7 @@ router.get('/:id', authenticate, async (req, res) => {
       success: true,
       subscription: {
         ...subscription,
-        filters: JSON.parse(subscription.filters)
+        filters: parseJson(subscription.filters)
       }
     });
   } catch (error) {
@@ -133,7 +134,7 @@ router.post('/', authenticate, async (req, res) => {
         message: 'Subscription created successfully',
         subscription: {
           ...subscription,
-          filters: JSON.parse(subscription.filters)
+          filters: parseJson(subscription.filters)
         }
       });
     } catch (websocketError) {
@@ -216,7 +217,7 @@ router.put('/:id', authenticate, async (req, res) => {
       
       // Create new subscription if active
       if (updateData.is_active) {
-        const filtersToUse = filters !== undefined ? filters : JSON.parse(existing.filters);
+        const filtersToUse = filters !== undefined ? filters : parseJson(existing.filters);
         const networkToUse = network !== undefined ? network : existing.network;
         await websocketService.createSubscription(req.params.id, filtersToUse, networkToUse);
       }
@@ -232,7 +233,7 @@ router.put('/:id', authenticate, async (req, res) => {
       message: 'Subscription updated successfully',
       subscription: {
         ...updated,
-        filters: JSON.parse(updated.filters)
+        filters: parseJson(updated.filters)
       }
     });
   } catch (error) {
@@ -306,7 +307,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
       // Create subscription
       await websocketService.createSubscription(
         req.params.id,
-        JSON.parse(existing.filters),
+        parseJson(existing.filters),
         existing.network
       );
     } else {
@@ -321,7 +322,7 @@ router.post('/:id/toggle', authenticate, async (req, res) => {
       message: `Subscription ${is_active ? 'activated' : 'deactivated'} successfully`,
       subscription: {
         ...updated,
-        filters: JSON.parse(updated.filters)
+        filters: parseJson(updated.filters)
       }
     });
   } catch (error) {
