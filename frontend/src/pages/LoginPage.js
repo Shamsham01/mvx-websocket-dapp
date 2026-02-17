@@ -9,7 +9,6 @@ import {
   LedgerLoginButton,
 } from '@multiversx/sdk-dapp/UI';
 import { useGetIsLoggedIn, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks/account';
-import { authAPI } from '../services/api';
 
 const nativeAuthConfig = {
   expirySeconds: 86400,
