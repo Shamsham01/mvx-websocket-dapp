@@ -3,8 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, Alert, CircularProgress, Button } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
 import { UnlockPanelManager } from '@multiversx/sdk-dapp/out/managers/UnlockPanelManager';
+import { ProviderTypeEnum } from '@multiversx/sdk-dapp/out/providers/types/providerFactory.types';
 import { useGetAccountInfo } from '@multiversx/sdk-dapp/out/react/account/useGetAccountInfo';
 import { useGetLoginInfo } from '@multiversx/sdk-dapp/out/react/loginInfo/useGetLoginInfo';
+
+// Hide WalletConnect (xPortal, drfi) when no project ID - prevents "Invalid WalletConnect setup" error
+const hasWalletConnectProjectId = Boolean(process.env.REACT_APP_WALLETCONNECT_V2_PROJECT_ID);
+const allowedProviders = hasWalletConnectProjectId
+  ? undefined // show all providers
+  : [
+      ProviderTypeEnum.extension,
+      ProviderTypeEnum.crossWindow,
+      ProviderTypeEnum.webview,
+      ProviderTypeEnum.ledger,
+      ProviderTypeEnum.passkey,
+      ProviderTypeEnum.metamask,
+    ];
 
 export default function LoginPage() {
   const { user, loginWithNativeAuth } = useAuth();
@@ -28,6 +42,7 @@ export default function LoginPage() {
       onClose: () => {
         navigate('/dashboard');
       },
+      allowedProviders,
     });
   }
 
