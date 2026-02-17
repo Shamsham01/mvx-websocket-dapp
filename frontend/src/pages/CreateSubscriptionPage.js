@@ -21,7 +21,7 @@ export default function CreateSubscriptionPage() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/login');
+      navigate('/');
       return;
     }
     if (isEdit) {

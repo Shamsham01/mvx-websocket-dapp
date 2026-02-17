@@ -7,7 +7,7 @@ import Container from '@mui/material/Container';
 
 // Components
 import Navbar from './components/Navbar';
-import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import DashboardPage from './pages/DashboardPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import CreateSubscriptionPage from './pages/CreateSubscriptionPage';
@@ -43,8 +43,8 @@ function App() {
             <Navbar />
             <Container component="main" sx={{ flex: 1, py: 4 }}>
               <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" />} />
-                <Route path="/login" element={<LoginPage />} />
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<Navigate to="/" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/subscriptions" element={<SubscriptionsPage />} />
                 <Route path="/subscriptions/new" element={<CreateSubscriptionPage />} />
@@ -54,7 +54,7 @@ function App() {
             <Box component="footer" sx={{ py: 3, px: 2, mt: 'auto', backgroundColor: 'background.paper' }}>
               <Container maxWidth="lg">
                 <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
-                  <p>MultiversX WebSocket Subscription DApp • Built with ❤️ by ClawB</p>
+                  <p>MakeX • MultiversX WebSocket Subscription DApp</p>
                   <p>Connect with the MultiversX blockchain in real-time</p>
                 </Box>
               </Container>

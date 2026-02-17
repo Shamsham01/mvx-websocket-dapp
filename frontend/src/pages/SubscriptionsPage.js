@@ -18,12 +18,12 @@ export default function SubscriptionsPage() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/login');
+      navigate('/');
       return;
     }
     subscriptionAPI.getAll()
       .then((data) => setSubscriptions(data.subscriptions || []))
-      .catch(() => navigate('/login'))
+      .catch(() => navigate('/'))
       .finally(() => setLoadingSubs(false));
   }, [user, navigate]);
 

@@ -12,12 +12,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/login');
+      navigate('/');
       return;
     }
     authAPI.getMe()
       .then((data) => setStats(data.stats))
-      .catch(() => navigate('/login'));
+      .catch(() => navigate('/'));
   }, [user, navigate]);
 
   if (loading || !user) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 4 }} />;
