@@ -10,8 +10,8 @@ import {
   Button,
   Chip,
   Divider,
-  Link,
 } from '@mui/material';
+import { Link as RouterLink } from 'react-router-dom';
 
 const videoUrl =
   'https://coral-defiant-guineafowl-119.mypinata.cloud/ipfs/bafybeih32s3dpoz6tau772ts3lxoexzkc3z67zmkavwopo7rfrchf5eaha/MakeX_Presentation.mp4';
@@ -77,52 +77,104 @@ const installLinks = [
 
 export default function HomePage() {
   return (
-    <Box>
+    <Box sx={{ background: '#090b10' }}>
       <Box
+        id="hero"
         sx={{
-          width: '100%',
-          background: 'radial-gradient(circle at 20% 10%, rgba(35,247,221,0.25), rgba(10,10,10,1) 55%)',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          py: { xs: 5, md: 8 },
+          width: '100vw',
+          minHeight: { xs: '72vh', md: '86vh' },
+          marginLeft: 'calc(50% - 50vw)',
+          marginRight: 'calc(50% - 50vw)',
+          position: 'relative',
+          overflow: 'hidden',
+          borderBottom: '1px solid rgba(35,247,221,0.2)',
         }}
       >
-        <Container maxWidth="xl">
+        <Box
+          component="video"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            zIndex: 0,
+          }}
+        >
+          <source src={videoUrl} type="video/mp4" />
+        </Box>
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            background:
+              'linear-gradient(120deg, rgba(4,7,14,0.92) 20%, rgba(7,12,21,0.7) 55%, rgba(35,247,221,0.2) 100%)',
+            zIndex: 1,
+          }}
+        />
+
+        <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 2, py: { xs: 7, md: 12 } }}>
           <Grid container spacing={{ xs: 4, md: 6 }} alignItems="center">
-            <Grid item xs={12} lg={6}>
-              <Stack spacing={2}>
-                <Chip label="No-code automation for MultiversX" sx={{ width: 'fit-content' }} />
+            <Grid item xs={12} lg={8}>
+              <Stack spacing={2.2}>
+                <Chip
+                  label="No-code automation for MultiversX"
+                  sx={{
+                    width: 'fit-content',
+                    color: '#d7fff9',
+                    border: '1px solid rgba(35,247,221,0.45)',
+                    backgroundColor: 'rgba(35,247,221,0.1)',
+                  }}
+                />
                 <Typography variant="h2" sx={{ fontWeight: 800, lineHeight: 1.08, fontSize: { xs: '2rem', md: '3.2rem' } }}>
                   MakeX: The &quot;Zapier&quot; of MultiversX
                 </Typography>
-                <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 680 }}>
+                <Typography variant="h6" sx={{ maxWidth: 760, color: 'rgba(255,255,255,0.86)' }}>
                   Build, automate, and scale on blockchain without writing code. MakeX connects MultiversX
                   with 2,500+ Web2 apps inside Make.com.
                 </Typography>
-                <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.72)' }}>
                   Use the Login button in the top-right navbar to connect your wallet and create
                   subscriptions.
                 </Typography>
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.4} sx={{ pt: 0.8 }}>
+                  <Button
+                    variant="contained"
+                    component="a"
+                    href="#install"
+                    sx={{
+                      width: { xs: '100%', sm: 'auto' },
+                      py: 1.1,
+                      px: 2.5,
+                      textTransform: 'none',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Install MakeX Apps
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    component={RouterLink}
+                    to="/dashboard"
+                    sx={{
+                      width: { xs: '100%', sm: 'auto' },
+                      py: 1.1,
+                      px: 2.5,
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      borderColor: 'rgba(255,255,255,0.4)',
+                      color: 'white',
+                    }}
+                  >
+                    Open Dashboard
+                  </Button>
+                </Stack>
               </Stack>
-            </Grid>
-            <Grid item xs={12} lg={6}>
-              <Box
-                component="video"
-                controls
-                playsInline
-                preload="metadata"
-                sx={{
-                  width: '100%',
-                  borderRadius: 3,
-                  border: '1px solid',
-                  borderColor: 'rgba(35,247,221,0.35)',
-                  backgroundColor: 'black',
-                  boxShadow: '0 24px 60px rgba(0,0,0,0.45)',
-                }}
-              >
-                <source src={videoUrl} type="video/mp4" />
-                Your browser does not support the video tag.
-              </Box>
             </Grid>
           </Grid>
         </Container>
@@ -138,7 +190,14 @@ export default function HomePage() {
         <Grid container spacing={2.5}>
           {toolkitItems.map((item) => (
             <Grid key={item.title} item xs={12} md={6} lg={4}>
-              <Card sx={{ height: '100%', border: '1px solid', borderColor: 'divider' }}>
+              <Card
+                sx={{
+                  height: '100%',
+                  border: '1px solid rgba(35,247,221,0.14)',
+                  background: 'linear-gradient(180deg, rgba(17,22,34,0.96), rgba(11,14,22,0.96))',
+                  boxShadow: '0 16px 36px rgba(0,0,0,0.28)',
+                }}
+              >
                 <CardContent>
                   <Typography variant="h6" sx={{ mb: 1 }}>
                     {item.title}
@@ -165,7 +224,13 @@ export default function HomePage() {
         <Grid container spacing={2}>
           {filters.map((filter) => (
             <Grid key={filter.name} item xs={12} md={6} lg={4}>
-              <Card sx={{ height: '100%', backgroundColor: 'background.paper' }}>
+              <Card
+                sx={{
+                  height: '100%',
+                  border: '1px solid rgba(35,247,221,0.14)',
+                  background: 'rgba(18,24,38,0.82)',
+                }}
+              >
                 <CardContent>
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.5 }}>
                     {filter.name}
@@ -191,7 +256,7 @@ export default function HomePage() {
         </Typography>
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%' }}>
+            <Card sx={{ height: '100%', border: '1px solid rgba(35,247,221,0.14)', background: 'rgba(18,24,38,0.82)' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                   Portfolio and Treasury Automation
@@ -204,7 +269,7 @@ export default function HomePage() {
             </Card>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Card sx={{ height: '100%' }}>
+            <Card sx={{ height: '100%', border: '1px solid rgba(35,247,221,0.14)', background: 'rgba(18,24,38,0.82)' }}>
               <CardContent>
                 <Typography variant="h6" sx={{ mb: 1 }}>
                   Community and On-Chain Operations
@@ -221,7 +286,7 @@ export default function HomePage() {
 
       <Divider />
 
-      <Container maxWidth="xl" sx={{ py: { xs: 5, md: 7 } }}>
+      <Container id="install" maxWidth="xl" sx={{ py: { xs: 5, md: 7 } }}>
         <Typography variant="h3" sx={{ fontWeight: 700, mb: 1 }}>
           Install the MakeX Apps
         </Typography>
@@ -231,18 +296,34 @@ export default function HomePage() {
         <Grid container spacing={2}>
           {installLinks.map((item) => (
             <Grid key={item.name} item xs={12} md={6} lg={4}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  border: '1px solid rgba(35,247,221,0.2)',
+                  background: 'linear-gradient(180deg, rgba(14,20,31,0.94), rgba(10,13,21,0.94))',
+                }}
+              >
                 <CardContent>
                   <Typography variant="h6">{item.name}</Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1.2, mb: 2.2 }}>
                     {item.description}
                   </Typography>
                   {item.href ? (
-                    <Button variant="contained" component={Link} href={item.href} target="_blank" rel="noreferrer">
+                    <Button
+                      variant="contained"
+                      component="a"
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      sx={{ textTransform: 'none', fontWeight: 700 }}
+                    >
                       Install Module
                     </Button>
                   ) : (
-                    <Button variant="outlined" disabled>
+                    <Button variant="outlined" disabled sx={{ textTransform: 'none' }}>
                       Coming Soon
                     </Button>
                   )}
