@@ -41,16 +41,44 @@ function App() {
         <Router>
           <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <Navbar />
-            <Container component="main" sx={{ flex: 1, py: 4 }}>
+            <Box component="main" sx={{ flex: 1 }}>
               <Routes>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<Navigate to="/" replace />} />
-                <Route path="/dashboard" element={<DashboardPage />} />
-                <Route path="/subscriptions" element={<SubscriptionsPage />} />
-                <Route path="/subscriptions/new" element={<CreateSubscriptionPage />} />
-                <Route path="/subscriptions/:id" element={<CreateSubscriptionPage />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <Container sx={{ py: 4 }}>
+                      <DashboardPage />
+                    </Container>
+                  }
+                />
+                <Route
+                  path="/subscriptions"
+                  element={
+                    <Container sx={{ py: 4 }}>
+                      <SubscriptionsPage />
+                    </Container>
+                  }
+                />
+                <Route
+                  path="/subscriptions/new"
+                  element={
+                    <Container sx={{ py: 4 }}>
+                      <CreateSubscriptionPage />
+                    </Container>
+                  }
+                />
+                <Route
+                  path="/subscriptions/:id"
+                  element={
+                    <Container sx={{ py: 4 }}>
+                      <CreateSubscriptionPage />
+                    </Container>
+                  }
+                />
               </Routes>
-            </Container>
+            </Box>
             <Box component="footer" sx={{ py: 3, px: 2, mt: 'auto', backgroundColor: 'background.paper' }}>
               <Container maxWidth="lg">
                 <Box sx={{ textAlign: 'center', color: 'text.secondary' }}>
