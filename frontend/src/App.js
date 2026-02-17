@@ -19,7 +19,6 @@ import { AuthProvider } from './context/AuthContext';
 const MVX_ENV = process.env.REACT_APP_MVX_ENV || 'mainnet';
 
 // WalletConnect v2 Project ID - get yours at https://cloud.walletconnect.com
-// mx-template public ID works for xPortal/WalletConnect login
 const WALLET_CONNECT_V2_PROJECT_ID =
   process.env.REACT_APP_WALLET_CONNECT_V2_PROJECT_ID ||
   '9b1a9564f91cb659ffe21b73d5c4e2d8';
@@ -54,7 +53,7 @@ function App() {
           walletConnectV2ProjectId: WALLET_CONNECT_V2_PROJECT_ID,
         }}
         dappConfig={{
-          shouldUseWebViewProvider: true,
+          shouldUseWebViewProvider: false,
           logoutRoute: '/login',
         }}
       >
@@ -83,8 +82,8 @@ function App() {
               </Container>
             </Box>
           </Box>
-        </Router>
-      </AuthProvider>
+          </Router>
+        </AuthProvider>
       </DappProvider>
     </ThemeProvider>
   );

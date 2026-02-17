@@ -57,7 +57,7 @@ export default function LoginPage() {
   }
 
   const commonLoginProps = {
-    callbackRoute: '/login',
+    callbackRoute: '/dashboard',
     nativeAuth: nativeAuthConfig,
   };
 
