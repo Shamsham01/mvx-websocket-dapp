@@ -137,6 +137,7 @@ In **Netlify** → Site Settings → Environment Variables, set:
 |-----|-------|----------|
 | `REACT_APP_API_URL` | Your Render API URL, e.g. `https://mvx-websocket-backend.onrender.com/api` | Yes |
 | `REACT_APP_MVX_ENV` | `mainnet` (or omit – mainnet is now the default) | No |
+| `REACT_APP_WALLET_CONNECT_V2_PROJECT_ID` | Your WalletConnect project ID from [cloud.walletconnect.com](https://cloud.walletconnect.com) | No (uses public fallback for xPortal) |
 
 Without `REACT_APP_API_URL`, the frontend will try to reach `http://localhost:3001/api`, which will fail in production.
 

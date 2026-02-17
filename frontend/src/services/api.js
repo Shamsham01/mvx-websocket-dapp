@@ -28,10 +28,13 @@ api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear token and redirect to login
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
+      const isLoginAttempt = error.config?.url?.includes('/auth/login');
+      if (!isLoginAttempt) {
+        // Only redirect on 401 for authenticated requests (not during login)
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error.response?.data || { error: 'Network error' });
   }
