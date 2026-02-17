@@ -1,29 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography, Alert, CircularProgress, Stack } from '@mui/material';
+import { Box, Paper, Typography, Alert, CircularProgress, Button } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
-import {
-  ExtensionLoginButton,
-  WalletConnectLoginButton,
-  WebWalletLoginButton,
-  LedgerLoginButton,
-} from '@multiversx/sdk-dapp/UI';
-import { useGetIsLoggedIn, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks/account';
-
-const nativeAuthConfig = {
-  expirySeconds: 86400,
-  tokenExpirationToastWarningSeconds: 300,
-};
+import { UnlockPanelManager } from '@multiversx/sdk-dapp/out/managers/UnlockPanelManager';
+import { useGetAccountInfo } from '@multiversx/sdk-dapp/out/react/account/useGetAccountInfo';
+import { useGetLoginInfo } from '@multiversx/sdk-dapp/out/react/loginInfo/useGetLoginInfo';
 
 export default function LoginPage() {
   const { user, loginWithNativeAuth } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const unlockPanelManagerRef = useRef(null);
 
-  const isWalletLoggedIn = useGetIsLoggedIn();
+  const { account } = useGetAccountInfo();
   const loginInfo = useGetLoginInfo();
   const nativeAuthToken = loginInfo?.tokenLogin?.nativeAuthToken;
+
+  const isWalletLoggedIn = Boolean(account?.address);
+
+  // Initialize UnlockPanelManager once
+  if (!unlockPanelManagerRef.current) {
+    unlockPanelManagerRef.current = UnlockPanelManager.init({
+      loginHandler: () => {
+        // Called after successful wallet login - will navigate when backend auth completes
+      },
+      onClose: () => {
+        navigate('/dashboard');
+      },
+    });
+  }
+
+  const handleOpenUnlockPanel = () => {
+    unlockPanelManagerRef.current?.openUnlockPanel();
+  };
 
   // When wallet is connected with Native Auth, authenticate with our backend
   useEffect(() => {
@@ -51,15 +61,10 @@ export default function LoginPage() {
     authenticateWithBackend();
   }, [isWalletLoggedIn, nativeAuthToken, user, loginWithNativeAuth, navigate, isAuthenticating]);
 
-  // Already logged in to our backend
+  // Redirect if already logged in
   if (user) {
-    return null; // Will redirect
+    return null;
   }
-
-  const commonLoginProps = {
-    callbackRoute: '/dashboard',
-    nativeAuth: nativeAuthConfig,
-  };
 
   return (
     <Box sx={{ maxWidth: 420, mx: 'auto', mt: 4 }}>
@@ -85,25 +90,15 @@ export default function LoginPage() {
             </Typography>
           </Box>
         ) : (
-          <Stack spacing={2} sx={{ mt: 2 }}>
-            <ExtensionLoginButton
-              {...commonLoginProps}
-              loginButtonText="MultiversX DeFi Wallet"
-            />
-            <WalletConnectLoginButton
-              {...commonLoginProps}
-              loginButtonText="xPortal App"
-              isWalletConnectV2
-            />
-            <WebWalletLoginButton
-              {...commonLoginProps}
-              loginButtonText="Web Wallet"
-            />
-            <LedgerLoginButton
-              {...commonLoginProps}
-              loginButtonText="Ledger Hardware Wallet"
-            />
-          </Stack>
+          <Button
+            variant="contained"
+            fullWidth
+            size="large"
+            onClick={handleOpenUnlockPanel}
+            sx={{ mt: 2 }}
+          >
+            Connect Wallet
+          </Button>
         )}
       </Paper>
     </Box>

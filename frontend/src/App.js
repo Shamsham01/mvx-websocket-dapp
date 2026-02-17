@@ -4,8 +4,6 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
-import { DappProvider } from '@multiversx/sdk-dapp/wrappers';
-import { SignTransactionsModals, NotificationModal } from '@multiversx/sdk-dapp/UI';
 
 // Components
 import Navbar from './components/Navbar';
@@ -14,14 +12,6 @@ import DashboardPage from './pages/DashboardPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import CreateSubscriptionPage from './pages/CreateSubscriptionPage';
 import { AuthProvider } from './context/AuthContext';
-
-// MultiversX network: mainnet | testnet | devnet
-const MVX_ENV = process.env.REACT_APP_MVX_ENV || 'mainnet';
-
-// WalletConnect v2 Project ID - get yours at https://cloud.walletconnect.com
-const WALLET_CONNECT_V2_PROJECT_ID =
-  process.env.REACT_APP_WALLET_CONNECT_V2_PROJECT_ID ||
-  '9b1a9564f91cb659ffe21b73d5c4e2d8';
 
 // Create theme
 const theme = createTheme({
@@ -47,20 +37,8 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <DappProvider
-        environment={MVX_ENV}
-        customNetworkConfig={{
-          walletConnectV2ProjectId: WALLET_CONNECT_V2_PROJECT_ID,
-        }}
-        dappConfig={{
-          shouldUseWebViewProvider: false,
-          logoutRoute: '/login',
-        }}
-      >
-        <AuthProvider>
-          <SignTransactionsModals />
-          <NotificationModal />
-          <Router>
+      <AuthProvider>
+        <Router>
           <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <Navbar />
             <Container component="main" sx={{ flex: 1, py: 4 }}>
@@ -82,9 +60,8 @@ function App() {
               </Container>
             </Box>
           </Box>
-          </Router>
-        </AuthProvider>
-      </DappProvider>
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

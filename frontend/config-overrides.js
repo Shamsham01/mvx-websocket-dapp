@@ -1,6 +1,15 @@
 const webpack = require('webpack');
 
 module.exports = function override(config) {
+  // Fix ESM resolution for @multiversx/sdk-dapp 5.x (fullySpecified)
+  // Required for CRA + webpack 5 with packages that use ESM imports without extensions
+  config.module.rules.push({
+    test: /\.m?js$/,
+    resolve: {
+      fullySpecified: false,
+    },
+  });
+
   const fallback = config.resolve.fallback || {};
   Object.assign(fallback, {
     crypto: require.resolve('crypto-browserify'),
