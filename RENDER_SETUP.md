@@ -129,6 +129,32 @@ After your Netlify site is live:
 
 ---
 
+## Netlify (Frontend) Environment Variables
+
+In **Netlify** → Site Settings → Environment Variables, set:
+
+| Key | Value | Required |
+|-----|-------|----------|
+| `REACT_APP_API_URL` | Your Render API URL, e.g. `https://mvx-websocket-backend.onrender.com/api` | Yes |
+| `REACT_APP_MVX_ENV` | `mainnet` (or omit – mainnet is now the default) | No |
+
+Without `REACT_APP_API_URL`, the frontend will try to reach `http://localhost:3001/api`, which will fail in production.
+
+---
+
+## Wallet Login (Native Auth)
+
+For secure wallet login to work, ensure:
+
+| Key | Value | Notes |
+|-----|-------|-------|
+| `FRONTEND_URL` | Your Netlify URL | Required for CORS and Native Auth origin validation |
+| `MVX_API_MAINNET` | `https://api.multiversx.com` | Used for Native Auth token validation (mainnet default) |
+
+Native Auth validates that login tokens come from your frontend origin.
+
+---
+
 ## Troubleshooting
 
 | Issue | Solution |

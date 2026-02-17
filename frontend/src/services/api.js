@@ -38,13 +38,16 @@ api.interceptors.response.use(
 );
 
 export const authAPI = {
-  login: (address, signature, message) => 
+  login: (address, signature, message) =>
     api.post('/auth/login', { address, signature, message }),
-  
-  logout: () => 
+
+  loginWithNativeAuth: (accessToken) =>
+    api.post('/auth/login/native', { accessToken }),
+
+  logout: () =>
     api.post('/auth/logout'),
-  
-  getMe: () => 
+
+  getMe: () =>
     api.get('/auth/me'),
 };
 

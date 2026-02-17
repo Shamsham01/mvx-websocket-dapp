@@ -2,13 +2,22 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AppBar, Toolbar, Typography, Button, Box } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import { getAccountProvider } from '@multiversx/sdk-dapp/providers/accountProvider';
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    try {
+      const provider = getAccountProvider();
+      if (provider) {
+        await provider.logout();
+      }
+    } catch (e) {
+      // Wallet may not be connected
+    }
+    await logout();
     navigate('/login');
   };
 

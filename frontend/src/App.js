@@ -4,6 +4,7 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
+import { DappProvider } from '@multiversx/sdk-dapp/wrappers';
 
 // Components
 import Navbar from './components/Navbar';
@@ -12,6 +13,9 @@ import DashboardPage from './pages/DashboardPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import CreateSubscriptionPage from './pages/CreateSubscriptionPage';
 import { AuthProvider } from './context/AuthContext';
+
+// MultiversX network: mainnet | testnet | devnet
+const MVX_ENV = process.env.REACT_APP_MVX_ENV || 'mainnet';
 
 // Create theme
 const theme = createTheme({
@@ -37,8 +41,14 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
-        <Router>
+      <DappProvider
+        environment={MVX_ENV}
+        dappConfig={{
+          shouldUseWebViewProvider: true,
+        }}
+      >
+        <AuthProvider>
+          <Router>
           <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
             <Navbar />
             <Container component="main" sx={{ flex: 1, py: 4 }}>
@@ -62,6 +72,7 @@ function App() {
           </Box>
         </Router>
       </AuthProvider>
+      </DappProvider>
     </ThemeProvider>
   );
 }

@@ -3,6 +3,22 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const database = require('../config/database');
 const logger = require('../utils/logger');
+const { NativeAuthServer } = require('@multiversx/sdk-native-auth-server');
+
+// Native Auth server for wallet signature verification
+const getNativeAuthServer = () => {
+  const apiUrl =
+    process.env.MVX_NATIVE_AUTH_API ||
+    process.env.MVX_API_MAINNET ||
+    process.env.MVX_API_DEVNET ||
+    'https://api.multiversx.com';
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  return new NativeAuthServer({
+    apiUrl,
+    acceptedOrigins: ['*', frontendUrl, 'http://localhost:3000', 'https://localhost:3000'],
+    maxExpirySeconds: 86400, // 24 hours
+  });
+};
 
 // Simple authentication middleware
 const authenticate = async (req, res, next) => {
@@ -30,7 +46,58 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// Login with MultiversX wallet signature
+// Login with MultiversX Native Auth (secure wallet signature)
+router.post('/login/native', async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ error: 'Access token is required' });
+    }
+
+    const nativeAuthServer = getNativeAuthServer();
+    const result = await nativeAuthServer.validate(accessToken);
+    const address = result.address;
+
+    // Create or update user
+    let user = await database.get('SELECT * FROM users WHERE address = ?', [address]);
+
+    if (!user) {
+      const dbResult = await database.run(
+        'INSERT INTO users (address) VALUES (?)',
+        [address]
+      );
+      user = { id: dbResult.id, address };
+      logger.info(`New user created (Native Auth): ${address}`);
+    } else {
+      await database.run(
+        'UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+        [user.id]
+      );
+      logger.info(`User logged in (Native Auth): ${address}`);
+    }
+
+    const token = jwt.sign(
+      { address: user.address, userId: user.id },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    res.json({
+      success: true,
+      token,
+      user: { id: user.id, address: user.address },
+    });
+  } catch (error) {
+    logger.error('Native Auth login error:', error);
+    const status = error.name === 'NativeAuthOriginNotAcceptedError' ? 403 : 401;
+    res.status(status).json({
+      error: error.message || 'Invalid or expired access token',
+    });
+  }
+});
+
+// Login with MultiversX wallet signature (legacy - NOT verified, for dev only)
 router.post('/login', async (req, res) => {
   try {
     const { address, signature, message } = req.body;

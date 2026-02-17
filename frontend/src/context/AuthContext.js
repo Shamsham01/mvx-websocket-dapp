@@ -32,6 +32,14 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const loginWithNativeAuth = async (accessToken) => {
+    const data = await authAPI.loginWithNativeAuth(accessToken);
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    setUser(data.user);
+    return data;
+  };
+
   const logout = async () => {
     try {
       await authAPI.logout();
@@ -42,7 +50,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, loginWithNativeAuth, logout }}>
       {children}
     </AuthContext.Provider>
   );

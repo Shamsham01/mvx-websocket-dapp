@@ -1,53 +1,111 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
+import { Box, Paper, Typography, Alert, CircularProgress, Stack } from '@mui/material';
 import { useAuth } from '../context/AuthContext';
+import {
+  ExtensionLoginButton,
+  WalletConnectLoginButton,
+  WebWalletLoginButton,
+  LedgerLoginButton,
+} from '@multiversx/sdk-dapp/UI';
+import { useGetIsLoggedIn, useGetLoginInfo } from '@multiversx/sdk-dapp/hooks/account';
+import { authAPI } from '../services/api';
+
+const nativeAuthConfig = {
+  expirySeconds: 86400,
+  tokenExpirationToastWarningSeconds: 300,
+};
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { user, loginWithNativeAuth } = useAuth();
   const navigate = useNavigate();
-  const [address, setAddress] = useState('');
   const [error, setError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
-  const handleDevLogin = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!address || address.length < 20) {
-      setError('Please enter a valid MultiversX address (erd1...)');
+  const isWalletLoggedIn = useGetIsLoggedIn();
+  const loginInfo = useGetLoginInfo();
+  const nativeAuthToken = loginInfo?.tokenLogin?.nativeAuthToken;
+
+  // When wallet is connected with Native Auth, authenticate with our backend
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard');
       return;
     }
-    try {
-      await login(address, 'dev-signature', 'dev-message');
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err?.error || err?.message || 'Login failed');
+    if (!isWalletLoggedIn || !nativeAuthToken || isAuthenticating) {
+      return;
     }
+
+    const authenticateWithBackend = async () => {
+      setIsAuthenticating(true);
+      setError('');
+      try {
+        await loginWithNativeAuth(nativeAuthToken);
+        navigate('/dashboard');
+      } catch (err) {
+        setError(err?.error || err?.message || 'Backend authentication failed');
+      } finally {
+        setIsAuthenticating(false);
+      }
+    };
+
+    authenticateWithBackend();
+  }, [isWalletLoggedIn, nativeAuthToken, user, loginWithNativeAuth, navigate, isAuthenticating]);
+
+  // Already logged in to our backend
+  if (user) {
+    return null; // Will redirect
+  }
+
+  const commonLoginProps = {
+    callbackRoute: '/login',
+    nativeAuth: nativeAuthConfig,
   };
 
   return (
-    <Box sx={{ maxWidth: 400, mx: 'auto', mt: 4 }}>
+    <Box sx={{ maxWidth: 420, mx: 'auto', mt: 4 }}>
       <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>Login</Typography>
+        <Typography variant="h5" gutterBottom>
+          Connect Wallet
+        </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Connect with your MultiversX wallet or use dev login for testing.
+          Connect your MultiversX wallet to sign in securely. Supports xPortal, DeFi Wallet, Web Wallet, Ledger, and more.
         </Typography>
-        <form onSubmit={handleDevLogin}>
-          <TextField
-            fullWidth
-            label="MultiversX Address (erd1...)"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="erd1..."
-            sx={{ mb: 2 }}
-          />
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <Button type="submit" variant="contained" fullWidth>
-            Dev Login (Testing)
-          </Button>
-        </form>
-        <Typography variant="caption" display="block" sx={{ mt: 2 }} color="text.secondary">
-          Note: Wallet connect (xPortal) can be added. For now, paste any erd1 address to test.
-        </Typography>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
+        {isAuthenticating ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
+            <CircularProgress sx={{ mb: 2 }} />
+            <Typography variant="body2" color="text.secondary">
+              Authenticating...
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={2} sx={{ mt: 2 }}>
+            <ExtensionLoginButton
+              {...commonLoginProps}
+              loginButtonText="MultiversX DeFi Wallet"
+            />
+            <WalletConnectLoginButton
+              {...commonLoginProps}
+              loginButtonText="xPortal App"
+              isWalletConnectV2
+            />
+            <WebWalletLoginButton
+              {...commonLoginProps}
+              loginButtonText="Web Wallet"
+            />
+            <LedgerLoginButton
+              {...commonLoginProps}
+              loginButtonText="Ledger Hardware Wallet"
+            />
+          </Stack>
+        )}
       </Paper>
     </Box>
   );
