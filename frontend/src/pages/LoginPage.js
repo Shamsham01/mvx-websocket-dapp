@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Paper, Typography, Alert, CircularProgress, Button } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@mui/material';
+import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import { useAuth } from '../context/AuthContext';
 import { UnlockPanelManager } from '@multiversx/sdk-dapp/out/managers/UnlockPanelManager';
 import { ProviderTypeEnum } from '@multiversx/sdk-dapp/out/providers/types/providerFactory.types';
 import { useGetAccountInfo } from '@multiversx/sdk-dapp/out/react/account/useGetAccountInfo';
 import { useGetLoginInfo } from '@multiversx/sdk-dapp/out/react/loginInfo/useGetLoginInfo';
+import PageHeader from '../components/ui/PageHeader';
+import SectionCard from '../components/ui/SectionCard';
 
 // Hide WalletConnect (xPortal, drfi) when no project ID - prevents "Invalid WalletConnect setup" error
 const hasWalletConnectProjectId = Boolean(process.env.REACT_APP_WALLETCONNECT_V2_PROJECT_ID);
@@ -82,40 +85,37 @@ export default function LoginPage() {
   }
 
   return (
-    <Box sx={{ maxWidth: 420, mx: 'auto', mt: 4 }}>
-      <Paper sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>
-          Connect Wallet
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Connect your MultiversX wallet to sign in securely. Supports xPortal, DeFi Wallet, Web Wallet, Ledger, and more.
-        </Typography>
-
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {isAuthenticating ? (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-            <CircularProgress sx={{ mb: 2 }} />
-            <Typography variant="body2" color="text.secondary">
-              Authenticating...
-            </Typography>
-          </Box>
-        ) : (
-          <Button
-            variant="contained"
-            fullWidth
-            size="large"
-            onClick={handleOpenUnlockPanel}
-            sx={{ mt: 2 }}
-          >
-            Connect Wallet
-          </Button>
-        )}
-      </Paper>
+    <Box>
+      <PageHeader
+        title="Wallet Access"
+        description="Authenticate with your MultiversX wallet to access dashboard features."
+      />
+      <SectionCard>
+        <Stack spacing={2}>
+          <Typography variant="body2" color="text.secondary">
+            Supported providers include xPortal, DeFi Wallet, web wallet, Ledger, Passkey, and MetaMask.
+          </Typography>
+          {error && <Alert severity="error">{error}</Alert>}
+          {isAuthenticating ? (
+            <Stack alignItems="center" spacing={1.2} sx={{ py: 3 }}>
+              <CircularProgress />
+              <Typography variant="body2" color="text.secondary">
+                Authenticating with backend...
+              </Typography>
+            </Stack>
+          ) : (
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleOpenUnlockPanel}
+              startIcon={<AccountBalanceWalletRoundedIcon />}
+              sx={{ width: { xs: '100%', sm: 'fit-content' } }}
+            >
+              Connect Wallet
+            </Button>
+          )}
+        </Stack>
+      </SectionCard>
     </Box>
   );
 }

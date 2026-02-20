@@ -1,14 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Paper, Typography, TextField, Button, Select, MenuItem, FormControl, InputLabel, CircularProgress } from '@mui/material';
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  FormControl,
+  Grid,
+  InputLabel,
+  MenuItem,
+  Select,
+  TextField,
+  Typography,
+} from '@mui/material';
+import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import { useAuth } from '../context/AuthContext';
 import { subscriptionAPI } from '../services/api';
+import { useNotify } from '../context/NotificationContext';
+import PageHeader from '../components/ui/PageHeader';
+import SectionCard from '../components/ui/SectionCard';
+import ErrorState from '../components/ui/ErrorState';
 
 export default function CreateSubscriptionPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
   const isEdit = !!id;
+  const notify = useNotify();
 
   const [form, setForm] = useState({
     name: '',
@@ -18,6 +36,8 @@ export default function CreateSubscriptionPage() {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [loadingExisting, setLoadingExisting] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -25,7 +45,10 @@ export default function CreateSubscriptionPage() {
       return;
     }
     if (isEdit) {
-      subscriptionAPI.getOne(id)
+      setLoadingExisting(true);
+      setLoadError('');
+      subscriptionAPI
+        .getOne(id)
         .then((data) => {
           const sub = data.subscription;
           setForm({
@@ -35,7 +58,8 @@ export default function CreateSubscriptionPage() {
             filters: typeof sub.filters === 'object' ? sub.filters : { sender: '', receiver: '', function: '', token: '', address: '' }
           });
         })
-        .catch(() => navigate('/subscriptions'));
+        .catch(() => setLoadError('Unable to load this subscription.'))
+        .finally(() => setLoadingExisting(false));
     }
   }, [user, navigate, id, isEdit]);
 
@@ -65,65 +89,135 @@ export default function CreateSubscriptionPage() {
     try {
       if (isEdit) {
         await subscriptionAPI.update(id, { ...form, filters });
+        notify('Subscription updated', 'success');
       } else {
         await subscriptionAPI.create({ ...form, filters });
+        notify('Subscription created', 'success');
       }
       navigate('/subscriptions');
     } catch (err) {
       const msg = err?.details || err?.error || err?.message || 'Failed to save';
       setError(msg);
+      notify(msg, 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading || !user) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 4 }} />;
+  if (loading || !user) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} />;
+  if (loadingExisting) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} />;
 
   return (
-    <Box sx={{ maxWidth: 600, mx: 'auto' }}>
-      <Typography variant="h4" gutterBottom>{isEdit ? 'Edit' : 'Create'} Subscription</Typography>
-      <Paper sx={{ p: 3 }}>
-        <form onSubmit={handleSubmit}>
-          <TextField
-            fullWidth
-            label="Name"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-            sx={{ mb: 2 }}
-          />
-          <TextField
-            fullWidth
-            label="Webhook URL"
-            value={form.webhook_url}
-            onChange={(e) => setForm({ ...form, webhook_url: e.target.value })}
-            placeholder="https://..."
-            required
-            sx={{ mb: 2 }}
-          />
-          <FormControl fullWidth sx={{ mb: 2 }}>
-            <InputLabel>Network</InputLabel>
-            <Select
-              value={form.network}
-              label="Network"
-              onChange={(e) => setForm({ ...form, network: e.target.value })}
-            >
-              <MenuItem value="mainnet">Mainnet</MenuItem>
-              <MenuItem value="testnet">Testnet</MenuItem>
-              <MenuItem value="devnet">Devnet</MenuItem>
-            </Select>
-          </FormControl>
-          <Typography variant="subtitle2" sx={{ mb: 1 }}>Filters (at least one required)</Typography>
-          <TextField fullWidth label="Sender" value={form.filters.sender} onChange={(e) => setForm({ ...form, filters: { ...form.filters, sender: e.target.value } })} sx={{ mb: 1 }} />
-          <TextField fullWidth label="Receiver" value={form.filters.receiver} onChange={(e) => setForm({ ...form, filters: { ...form.filters, receiver: e.target.value } })} sx={{ mb: 1 }} />
-          <TextField fullWidth label="Function" value={form.filters.function} onChange={(e) => setForm({ ...form, filters: { ...form.filters, function: e.target.value } })} sx={{ mb: 1 }} />
-          <TextField fullWidth label="Token" value={form.filters.token} onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })} sx={{ mb: 1 }} />
-          <TextField fullWidth label="Address" value={form.filters.address} onChange={(e) => setForm({ ...form, filters: { ...form.filters, address: e.target.value } })} sx={{ mb: 2 }} />
-          {error && <Typography color="error" sx={{ mb: 1 }}>{error}</Typography>}
-          <Button type="submit" variant="contained" disabled={saving}>{saving ? 'Saving...' : (isEdit ? 'Update' : 'Create')}</Button>
-          <Button sx={{ ml: 1 }} onClick={() => navigate('/subscriptions')}>Cancel</Button>
-        </form>
-      </Paper>
+    <Box>
+      <PageHeader
+        title={isEdit ? 'Edit Subscription' : 'Create Subscription'}
+        description="Define event filters and destination webhook for real-time delivery."
+      />
+
+      {loadError ? (
+        <SectionCard>
+          <ErrorState title="Subscription not available" message={loadError} onRetry={() => navigate('/subscriptions')} />
+        </SectionCard>
+      ) : (
+        <SectionCard>
+          <form onSubmit={handleSubmit}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  label="Name"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  label="Webhook URL"
+                  value={form.webhook_url}
+                  onChange={(e) => setForm({ ...form, webhook_url: e.target.value })}
+                  placeholder="https://your-endpoint.com/webhook"
+                  required
+                  helperText="Use an HTTPS endpoint for secure production delivery."
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Network</InputLabel>
+                  <Select
+                    value={form.network}
+                    label="Network"
+                    onChange={(e) => setForm({ ...form, network: e.target.value })}
+                  >
+                    <MenuItem value="mainnet">Mainnet</MenuItem>
+                    <MenuItem value="testnet">Testnet</MenuItem>
+                    <MenuItem value="devnet">Devnet</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Filters (at least one required)
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Sender"
+                  value={form.filters.sender}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, sender: e.target.value } })}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Receiver"
+                  value={form.filters.receiver}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, receiver: e.target.value } })}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Function"
+                  value={form.filters.function}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, function: e.target.value } })}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Token"
+                  value={form.filters.token}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Address"
+                  value={form.filters.address}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, address: e.target.value } })}
+                />
+              </Grid>
+              {error && (
+                <Grid item xs={12}>
+                  <Alert severity="error">{error}</Alert>
+                </Grid>
+              )}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', gap: 1, pt: 1 }}>
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disabled={saving}
+                    startIcon={<SaveRoundedIcon />}
+                  >
+                    {saving ? 'Saving...' : isEdit ? 'Update Subscription' : 'Create Subscription'}
+                  </Button>
+                  <Button variant="outlined" onClick={() => navigate('/subscriptions')}>
+                    Cancel
+                  </Button>
+                </Box>
+              </Grid>
+            </Grid>
+          </form>
+        </SectionCard>
+      )}
     </Box>
   );
 }
