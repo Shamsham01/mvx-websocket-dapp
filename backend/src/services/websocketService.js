@@ -170,6 +170,13 @@ class WebSocketService {
 
       // Process each transfer for each subscription
       for (const transfer of data.transfers) {
+        if (!this.shouldProcessTransfer(transfer)) {
+          logger.debug(
+            `Skipping non-success transfer ${transfer?.txHash || 'unknown-tx'} with status ${transfer?.status || 'unknown'}`
+          );
+          continue;
+        }
+
         const deliveryTasks = [];
 
         for (const subscription of subscriptions) {
@@ -198,6 +205,11 @@ class WebSocketService {
       transfer.action?.arguments?.function ||
       null
     );
+  }
+
+  shouldProcessTransfer(transfer) {
+    // Webhooks should only be delivered once transaction is finalized as success.
+    return this.normalizeValue(transfer?.status) === 'success';
   }
 
   matchesFilters(transfer, filters) {
