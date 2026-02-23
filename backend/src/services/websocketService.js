@@ -55,6 +55,7 @@ class WebSocketService {
       // Set up event handlers
       socket.on('connect', () => {
         logger.info(`WebSocket connected to ${network}`);
+        this.resubscribeNetwork(network, socket);
       });
 
       socket.on('disconnect', (reason) => {
@@ -169,10 +170,16 @@ class WebSocketService {
 
       // Process each transfer for each subscription
       for (const transfer of data.transfers) {
+        const deliveryTasks = [];
+
         for (const subscription of subscriptions) {
           if (this.matchesFilters(transfer, parseJson(subscription.filters))) {
-            await webhookService.deliverWebhook(subscription, transfer);
+            deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
           }
+        }
+
+        if (deliveryTasks.length > 0) {
+          await Promise.allSettled(deliveryTasks);
         }
       }
     } catch (error) {
@@ -180,45 +187,86 @@ class WebSocketService {
     }
   }
 
+  normalizeValue(value) {
+    return typeof value === 'string' ? value.trim().toLowerCase() : value;
+  }
+
+  transferFunctionName(transfer) {
+    return (
+      transfer.function ||
+      transfer.action?.name ||
+      transfer.action?.arguments?.function ||
+      null
+    );
+  }
+
   matchesFilters(transfer, filters) {
+    const normalizedFilters = filters || {};
+    const sender = this.normalizeValue(transfer.sender);
+    const receiver = this.normalizeValue(transfer.receiver);
+    const relayer = this.normalizeValue(transfer.relayer);
+    const functionName = this.normalizeValue(this.transferFunctionName(transfer));
+
     // Check each filter condition
-    if (filters.sender && transfer.sender !== filters.sender) {
+    if (normalizedFilters.sender && sender !== this.normalizeValue(normalizedFilters.sender)) {
       return false;
     }
 
-    if (filters.receiver && transfer.receiver !== filters.receiver) {
+    if (normalizedFilters.receiver && receiver !== this.normalizeValue(normalizedFilters.receiver)) {
       return false;
     }
 
-    if (filters.function && transfer.function !== filters.function) {
+    if (normalizedFilters.function && functionName !== this.normalizeValue(normalizedFilters.function)) {
       return false;
     }
 
-    if (filters.token) {
+    if (normalizedFilters.token) {
       // Check if transfer involves the specified token
-      const hasToken = transfer.action?.arguments?.transfers?.some(t => t.token === filters.token);
+      const normalizedToken = this.normalizeValue(normalizedFilters.token);
+      const hasToken = transfer.action?.arguments?.transfers?.some(
+        t => this.normalizeValue(t.token) === normalizedToken
+      );
       if (!hasToken && transfer.value === '0') {
         return false;
       }
     }
 
-    if (filters.address) {
+    if (normalizedFilters.address) {
       // Check if address matches sender, receiver, or relayer
+      const normalizedAddress = this.normalizeValue(normalizedFilters.address);
       const matchesAddress = 
-        transfer.sender === filters.address ||
-        transfer.receiver === filters.address ||
-        transfer.relayer === filters.address;
+        sender === normalizedAddress ||
+        receiver === normalizedAddress ||
+        relayer === normalizedAddress;
       
       if (!matchesAddress) {
         return false;
       }
     }
 
-    if (filters.relayer && transfer.relayer !== filters.relayer) {
+    if (normalizedFilters.relayer && relayer !== this.normalizeValue(normalizedFilters.relayer)) {
       return false;
     }
 
     return true;
+  }
+
+  resubscribeNetwork(network, socket) {
+    try {
+      let count = 0;
+      for (const [, subscription] of this.subscriptions) {
+        if (subscription.network !== network) {
+          continue;
+        }
+        socket.emit('subscribeCustomTransfers', subscription.payload);
+        count++;
+      }
+      if (count > 0) {
+        logger.info(`Re-subscribed ${count} active in-memory subscription(s) for ${network}`);
+      }
+    } catch (error) {
+      logger.error(`Failed to re-subscribe subscriptions for ${network}:`, error.message);
+    }
   }
 
   async cleanup() {
