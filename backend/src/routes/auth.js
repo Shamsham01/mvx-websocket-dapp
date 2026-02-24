@@ -189,4 +189,82 @@ router.get('/me', authenticate, async (req, res) => {
   }
 });
 
+// Get dashboard analytics for current user
+router.get('/dashboard-analytics', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const subscriptionStats = await database.get(`
+      SELECT
+        COUNT(*)::int AS total_subscriptions,
+        COALESCE(SUM(CASE WHEN is_active THEN 1 ELSE 0 END), 0)::int AS active_subscriptions
+      FROM subscriptions
+      WHERE user_id = ?
+    `, [userId]);
+
+    const webhookStats = await database.get(`
+      SELECT
+        COUNT(wl.id)::int AS total_webhook_calls,
+        COALESCE(SUM(CASE WHEN wl.status_code BETWEEN 200 AND 299 THEN 1 ELSE 0 END), 0)::int AS successful_webhook_calls,
+        COALESCE(SUM(CASE WHEN wl.status_code IS NULL OR wl.status_code < 200 OR wl.status_code >= 300 THEN 1 ELSE 0 END), 0)::int AS failed_webhook_calls
+      FROM subscriptions s
+      LEFT JOIN webhook_logs wl ON wl.subscription_id = s.id
+      WHERE s.user_id = ?
+    `, [userId]);
+
+    const subscriptions = await database.query(`
+      SELECT
+        s.id,
+        s.name,
+        s.is_active,
+        COUNT(wl.id)::int AS total_webhook_calls
+      FROM subscriptions s
+      LEFT JOIN webhook_logs wl ON wl.subscription_id = s.id
+      WHERE s.user_id = ?
+      GROUP BY s.id, s.name, s.is_active, s.created_at
+      ORDER BY total_webhook_calls DESC, s.created_at DESC
+    `, [userId]);
+
+    const callsPerDay = await database.query(`
+      SELECT
+        wl.subscription_id,
+        s.name AS subscription_name,
+        DATE_TRUNC('day', wl.delivered_at)::date AS day,
+        COUNT(wl.id)::int AS total_calls
+      FROM webhook_logs wl
+      JOIN subscriptions s ON s.id = wl.subscription_id
+      WHERE s.user_id = ?
+        AND wl.delivered_at >= NOW() - INTERVAL '45 days'
+      GROUP BY wl.subscription_id, s.name, DATE_TRUNC('day', wl.delivered_at)
+      ORDER BY day ASC
+    `, [userId]);
+
+    const totalWebhookCalls = webhookStats?.total_webhook_calls || 0;
+    const successfulWebhookCalls = webhookStats?.successful_webhook_calls || 0;
+    const failedWebhookCalls = webhookStats?.failed_webhook_calls || 0;
+    const successRate = totalWebhookCalls
+      ? Number(((successfulWebhookCalls / totalWebhookCalls) * 100).toFixed(1))
+      : 0;
+
+    res.json({
+      success: true,
+      stats: {
+        total_subscriptions: subscriptionStats?.total_subscriptions || 0,
+        active_subscriptions: subscriptionStats?.active_subscriptions || 0,
+        total_webhook_calls: totalWebhookCalls,
+        successful_webhook_calls: successfulWebhookCalls,
+        failed_webhook_calls: failedWebhookCalls,
+        success_rate: successRate
+      },
+      charts: {
+        subscriptions,
+        calls_per_day: callsPerDay
+      }
+    });
+  } catch (error) {
+    logger.error('Get dashboard analytics error:', error);
+    res.status(500).json({ error: 'Failed to load dashboard analytics' });
+  }
+});
+
 module.exports = router;

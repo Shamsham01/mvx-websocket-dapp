@@ -52,6 +52,9 @@ export const authAPI = {
 
   getMe: () =>
     api.get('/auth/me'),
+
+  getDashboardAnalytics: () =>
+    api.get('/auth/dashboard-analytics'),
 };
 
 export const subscriptionAPI = {
