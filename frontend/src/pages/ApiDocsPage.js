@@ -48,9 +48,12 @@ export default function ApiDocsPage() {
             border: `1px solid ${alpha('#94a3b8', 0.2)}`
           },
           '& .swagger-ui .opblock': {
-            borderRadius: 12,
+            borderRadius: 2,
             border: `1px solid ${alpha('#94a3b8', 0.2)}`,
             overflow: 'hidden'
+          },
+          '& .swagger-ui .opblock .opblock-summary': {
+            borderRadius: 0
           },
           '& .swagger-ui .opblock .opblock-section-header': {
             background: alpha('#0f172a', 0.66),
@@ -58,7 +61,7 @@ export default function ApiDocsPage() {
           },
           '& .swagger-ui .opblock .opblock-body, & .swagger-ui .responses-wrapper, & .swagger-ui .parameters-container': {
             background: alpha('#0b1324', 0.64),
-            borderRadius: 10
+            borderRadius: 2
           },
           '& .swagger-ui .response-control-media-type__accept-message, & .swagger-ui .responses-table .response': {
             color: '#e2e8f0'
