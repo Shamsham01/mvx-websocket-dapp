@@ -42,13 +42,13 @@ export default function ApiDocsPage() {
             display: 'none'
           },
           '& .swagger-ui .scheme-container': {
-            borderRadius: 12,
+            borderRadius: 0,
             background: alpha('#0f1628', 0.65),
             boxShadow: 'none',
             border: `1px solid ${alpha('#94a3b8', 0.2)}`
           },
           '& .swagger-ui .opblock': {
-            borderRadius: 2,
+            borderRadius: 0,
             border: `1px solid ${alpha('#94a3b8', 0.2)}`,
             overflow: 'hidden'
           },
@@ -61,7 +61,7 @@ export default function ApiDocsPage() {
           },
           '& .swagger-ui .opblock .opblock-body, & .swagger-ui .responses-wrapper, & .swagger-ui .parameters-container': {
             background: alpha('#0b1324', 0.64),
-            borderRadius: 2
+            borderRadius: 0
           },
           '& .swagger-ui .response-control-media-type__accept-message, & .swagger-ui .responses-table .response': {
             color: '#e2e8f0'
@@ -90,13 +90,22 @@ export default function ApiDocsPage() {
             background: alpha('#0b1324', 0.85),
             color: '#e2e8f0',
             border: `1px solid ${alpha('#94a3b8', 0.35)}`,
-            borderRadius: 10
+            borderRadius: 0
+          },
+          '& .swagger-ui .opblock .opblock-section-header, & .swagger-ui .responses-inner, & .swagger-ui .parameters-col_description, & .swagger-ui .parameter__in, & .swagger-ui .model-box': {
+            borderRadius: 0
+          },
+          '& .swagger-ui .scheme-container .schemes-wrapper, & .swagger-ui .auth-wrapper, & .swagger-ui .auth-container': {
+            borderRadius: 0
+          },
+          '& .swagger-ui .btn, & .swagger-ui .authorization__btn, & .swagger-ui .opblock-control-arrow': {
+            borderRadius: 0
           },
           '& .swagger-ui .dialog-ux .backdrop-ux': {
             background: alpha('#020617', 0.72)
           },
           '& .swagger-ui .dialog-ux .modal-ux': {
-            borderRadius: 14,
+            borderRadius: 0,
             border: `1px solid ${alpha('#94a3b8', 0.3)}`,
             background: alpha('#0b1324', 0.96),
             boxShadow: '0 20px 50px rgba(2, 8, 20, 0.6)'
@@ -104,6 +113,9 @@ export default function ApiDocsPage() {
           '& .swagger-ui .dialog-ux .modal-ux-header': {
             background: alpha('#111c34', 0.92),
             borderBottomColor: alpha('#94a3b8', 0.24)
+          },
+          '& .swagger-ui .dialog-ux .modal-ux-content, & .swagger-ui .dialog-ux input[type=text], & .swagger-ui .dialog-ux .auth-btn-wrapper .btn-done, & .swagger-ui .dialog-ux .auth-btn-wrapper .btn.modal-btn, & .swagger-ui .servers > label select': {
+            borderRadius: 0
           },
           '& .swagger-ui .dialog-ux .modal-ux-content, & .swagger-ui .dialog-ux .modal-ux-header h3, & .swagger-ui .dialog-ux .auth-container h4, & .swagger-ui .dialog-ux .auth-container p, & .swagger-ui .dialog-ux label, & .swagger-ui .dialog-ux svg': {
             color: '#e2e8f0'
