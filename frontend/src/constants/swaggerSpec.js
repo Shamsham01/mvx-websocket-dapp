@@ -8,8 +8,7 @@ const swaggerSpec = {
       'API reference for MakeX subscription management, webhook analytics, and account operations.',
     version: '1.0.0',
     contact: {
-      name: 'MakeX',
-      url: 'https://makex.app'
+      name: 'MakeX'
     }
   },
   servers: [
