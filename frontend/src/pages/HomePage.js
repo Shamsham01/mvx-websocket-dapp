@@ -48,6 +48,9 @@ export default function HomePage() {
             <Button variant="outlined" component={RouterLink} to="/dashboard">
               Open Dashboard
             </Button>
+            <Button variant="outlined" component={RouterLink} to="/api-docs">
+              API Swagger
+            </Button>
           </Stack>
         }
       />

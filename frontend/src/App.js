@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import CreateSubscriptionPage from './pages/CreateSubscriptionPage';
 import LoginPage from './pages/LoginPage';
+import ApiDocsPage from './pages/ApiDocsPage';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 
@@ -27,6 +28,7 @@ function App() {
                 <Route path="/subscriptions" element={<SubscriptionsPage />} />
                 <Route path="/subscriptions/new" element={<CreateSubscriptionPage />} />
                 <Route path="/subscriptions/:id" element={<CreateSubscriptionPage />} />
+                <Route path="/api-docs" element={<ApiDocsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </AppShell>

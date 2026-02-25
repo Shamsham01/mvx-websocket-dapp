@@ -25,6 +25,7 @@ import KeyboardDoubleArrowLeftRoundedIcon from '@mui/icons-material/KeyboardDoub
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import PlaylistAddCheckRoundedIcon from '@mui/icons-material/PlaylistAddCheckRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import ApiRoundedIcon from '@mui/icons-material/ApiRounded';
 import PowerSettingsNewRoundedIcon from '@mui/icons-material/PowerSettingsNewRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import { alpha, useTheme } from '@mui/material/styles';
@@ -57,6 +58,7 @@ const navItems = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardRoundedIcon /> },
   { label: 'Subscriptions', path: '/subscriptions', icon: <PlaylistAddCheckRoundedIcon /> },
   { label: 'Create Subscription', path: '/subscriptions/new', icon: <AddRoundedIcon /> },
+  { label: 'API Docs', path: '/api-docs', icon: <ApiRoundedIcon /> },
 ];
 
 function ConnectedStatus({ connected }) {

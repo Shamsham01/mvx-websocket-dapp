@@ -134,9 +134,14 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Monitor your subscription analytics, webhook usage, and delivery trends."
         actions={
-          <Button component={Link} to="/subscriptions/new" variant="contained">
-            Create Subscription
-          </Button>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button component={Link} to="/subscriptions/new" variant="contained">
+              Create Subscription
+            </Button>
+            <Button component={Link} to="/api-docs" variant="outlined">
+              API Docs
+            </Button>
+          </Stack>
         }
       />
 
