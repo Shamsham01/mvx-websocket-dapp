@@ -4,8 +4,16 @@ import { alpha } from '@mui/material/styles';
 import { useAuth } from '../../context/AuthContext';
 import { openWalletConnect } from '../../utils/walletConnect';
 
-export default function FreeTrialSection() {
+export default function FreeTrialSection({ onOpenTrial }) {
   const { user } = useAuth();
+
+  const handleClick = () => {
+    if (!user) {
+      openWalletConnect();
+      return;
+    }
+    onOpenTrial?.();
+  };
 
   return (
     <Box
@@ -36,13 +44,7 @@ export default function FreeTrialSection() {
               After the trial, operations are powered by $REWARD with micro-fees
               (~$0.03/action). No subscriptions, no hidden costs.
             </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={() => {
-                if (!user) openWalletConnect();
-              }}
-            >
+            <Button variant="contained" size="large" onClick={handleClick}>
               Claim Free Trial
             </Button>
           </CardContent>

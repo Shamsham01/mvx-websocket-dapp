@@ -13,7 +13,7 @@ function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
 }
 
-export default function HeroSection() {
+export default function HeroSection({ onOpenTrial }) {
   const { user } = useAuth();
   const videoRef = useRef(null);
   const [playing, setPlaying] = useState(false);
@@ -27,7 +27,7 @@ export default function HeroSection() {
       openWalletConnect();
       return;
     }
-    scrollTo('free-trial');
+    onOpenTrial?.();
   };
 
   return (
