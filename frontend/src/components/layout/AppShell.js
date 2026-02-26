@@ -13,6 +13,8 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   Stack,
   Toolbar,
   Tooltip,
@@ -28,32 +30,20 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import ApiRoundedIcon from '@mui/icons-material/ApiRounded';
 import PowerSettingsNewRoundedIcon from '@mui/icons-material/PowerSettingsNewRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
+import ArrowDropDownRoundedIcon from '@mui/icons-material/ArrowDropDownRounded';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useGetAccountInfo } from '@multiversx/sdk-dapp/out/react/account/useGetAccountInfo';
 import { useGetLoginInfo } from '@multiversx/sdk-dapp/out/react/loginInfo/useGetLoginInfo';
-import { ProviderTypeEnum } from '@multiversx/sdk-dapp/out/providers/types/providerFactory.types';
 import { getAccountProvider } from '@multiversx/sdk-dapp/out/providers/helpers/accountProvider';
-import { UnlockPanelManager } from '@multiversx/sdk-dapp/out/managers/UnlockPanelManager';
 import { useAuth } from '../../context/AuthContext';
+import { initWalletConnect, openWalletConnect } from '../../utils/walletConnect';
+import { COMMUNITY, DOCS, MEDIA } from '../../constants/links';
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 84;
-const hasWalletConnectProjectId = Boolean(process.env.REACT_APP_WALLETCONNECT_V2_PROJECT_ID);
-const allowedProviders = hasWalletConnectProjectId
-  ? undefined
-  : [
-      ProviderTypeEnum.extension,
-      ProviderTypeEnum.crossWindow,
-      ProviderTypeEnum.webview,
-      ProviderTypeEnum.ledger,
-      ProviderTypeEnum.passkey,
-      ProviderTypeEnum.metamask,
-    ];
 
-let unlockPanelManager;
-
-const navItems = [
+const appNavItems = [
   { label: 'Home', path: '/', icon: <HomeRoundedIcon /> },
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardRoundedIcon /> },
   { label: 'Subscriptions', path: '/subscriptions', icon: <PlaylistAddCheckRoundedIcon /> },
@@ -90,12 +80,17 @@ function ConnectedStatus({ connected }) {
   );
 }
 
+function scrollToSection(id) {
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+}
+
 export default function AppShell({ children }) {
   const muiTheme = useTheme();
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = React.useState(false);
   const [isAuthenticating, setIsAuthenticating] = React.useState(false);
+  const [communityAnchor, setCommunityAnchor] = React.useState(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { user, logout, loginWithNativeAuth } = useAuth();
@@ -103,12 +98,9 @@ export default function AppShell({ children }) {
   const loginInfo = useGetLoginInfo();
   const nativeAuthToken = loginInfo?.tokenLogin?.nativeAuthToken;
 
-  if (!unlockPanelManager) {
-    unlockPanelManager = UnlockPanelManager.init({
-      loginHandler: () => {},
-      allowedProviders,
-    });
-  }
+  const isLandingPage = pathname === '/';
+
+  initWalletConnect();
 
   React.useEffect(() => {
     if (user || !account?.address || !nativeAuthToken || isAuthenticating) {
@@ -130,10 +122,6 @@ export default function AppShell({ children }) {
     authenticate();
   }, [account?.address, nativeAuthToken, user, loginWithNativeAuth, navigate, pathname, isAuthenticating]);
 
-  const handleDrawerToggle = () => {
-    setMobileOpen((open) => !open);
-  };
-
   const handleLogout = async () => {
     try {
       const provider = getAccountProvider();
@@ -147,13 +135,247 @@ export default function AppShell({ children }) {
     navigate('/');
   };
 
+  const walletButtons = user ? (
+    <>
+      <Tooltip title={user.address}>
+        <Chip
+          label={`${user.address?.slice(0, 8)}...${user.address?.slice(-6)}`}
+          size="small"
+          sx={{ maxWidth: 200 }}
+        />
+      </Tooltip>
+      <Button
+        variant="outlined"
+        color="error"
+        startIcon={<PowerSettingsNewRoundedIcon />}
+        onClick={handleLogout}
+      >
+        Logout
+      </Button>
+    </>
+  ) : (
+    <Button
+      variant="contained"
+      startIcon={
+        isAuthenticating ? (
+          <CircularProgress color="inherit" size={14} />
+        ) : (
+          <AccountBalanceWalletRoundedIcon />
+        )
+      }
+      onClick={() => openWalletConnect()}
+      disabled={isAuthenticating}
+    >
+      Connect Wallet
+    </Button>
+  );
+
+  const communityLinks = [
+    { label: 'Discord', href: COMMUNITY.DISCORD },
+    { label: 'X (Twitter)', href: COMMUNITY.X },
+    { label: 'LinkedIn', href: COMMUNITY.LINKEDIN },
+    { label: 'Facebook', href: COMMUNITY.FACEBOOK },
+  ];
+
+  /* ── Landing page layout ────────────────────────────────────────────── */
+  if (isLandingPage) {
+    const landingDrawerContent = (
+      <Box sx={{ px: 1.5, py: 2 }}>
+        <Stack direction="row" spacing={1.2} alignItems="center" sx={{ px: 1, mb: 2 }}>
+          <Avatar src={MEDIA.MAKEX_LOGO} alt="MakeX" sx={{ width: 34, height: 34 }} />
+          <Typography variant="subtitle2" noWrap>
+            MakeX
+          </Typography>
+        </Stack>
+        <List sx={{ py: 0.5 }}>
+          {[
+            { label: 'Home', action: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
+            { label: 'Apps', action: () => scrollToSection('apps') },
+            { label: 'Install', action: () => scrollToSection('install') },
+          ].map((item) => (
+            <ListItemButton
+              key={item.label}
+              onClick={() => {
+                setMobileOpen(false);
+                item.action();
+              }}
+              sx={{ borderRadius: 2.5, mb: 0.5 }}
+            >
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+          <ListItemButton
+            component={Link}
+            to="/subscriptions"
+            onClick={() => setMobileOpen(false)}
+            sx={{ borderRadius: 2.5, mb: 0.5 }}
+          >
+            <ListItemText primary="WebSocket Subscriptions" />
+          </ListItemButton>
+          {[
+            { label: 'Litepaper', href: DOCS.LITEPAPER },
+            { label: 'Docs', href: DOCS.MAKEX_DOCS },
+            ...communityLinks,
+          ].map((item) => (
+            <ListItemButton
+              key={item.label}
+              component="a"
+              href={item.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setMobileOpen(false)}
+              sx={{ borderRadius: 2.5, mb: 0.5 }}
+            >
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Box>
+    );
+
+    return (
+      <Box sx={{ minHeight: '100vh' }}>
+        <AppBar position="fixed" color="transparent">
+          <Toolbar sx={{ minHeight: 68 }}>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={() => setMobileOpen(true)}
+              sx={{ mr: 1.5, display: { md: 'none' } }}
+              aria-label="Open navigation"
+            >
+              <MenuRoundedIcon />
+            </IconButton>
+
+            <Stack direction="row" alignItems="center" spacing={1.2} sx={{ minWidth: 0 }}>
+              <Avatar src={MEDIA.MAKEX_LOGO} alt="MakeX" sx={{ width: 30, height: 30 }} />
+              <Typography variant="subtitle1" noWrap sx={{ fontWeight: 700 }}>
+                MakeX
+              </Typography>
+            </Stack>
+
+            {/* Desktop horizontal nav */}
+            <Stack
+              direction="row"
+              spacing={0.5}
+              alignItems="center"
+              sx={{ ml: 4, display: { xs: 'none', md: 'flex' } }}
+            >
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => scrollToSection('apps')}
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Apps
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                onClick={() => scrollToSection('install')}
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Install
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                component={Link}
+                to="/subscriptions"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Subscriptions
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                href={DOCS.LITEPAPER}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Litepaper
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                href={DOCS.MAKEX_DOCS}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Docs
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                endIcon={<ArrowDropDownRoundedIcon />}
+                onClick={(e) => setCommunityAnchor(e.currentTarget)}
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Community
+              </Button>
+              <Menu
+                anchorEl={communityAnchor}
+                open={Boolean(communityAnchor)}
+                onClose={() => setCommunityAnchor(null)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              >
+                {communityLinks.map((item) => (
+                  <MenuItem
+                    key={item.label}
+                    component="a"
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setCommunityAnchor(null)}
+                  >
+                    {item.label}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </Stack>
+
+            <Box sx={{ flexGrow: 1 }} />
+
+            <Stack direction="row" alignItems="center" spacing={1.2}>
+              <ConnectedStatus connected={Boolean(user)} />
+              {walletButtons}
+            </Stack>
+          </Toolbar>
+        </AppBar>
+
+        {/* Mobile drawer for landing page */}
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          ModalProps={{ keepMounted: true }}
+          sx={{
+            display: { xs: 'block', md: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
+        >
+          {landingDrawerContent}
+        </Drawer>
+
+        <Box component="main">
+          <Toolbar />
+          {children}
+        </Box>
+      </Box>
+    );
+  }
+
+  /* ── App pages layout (with sidebar) ────────────────────────────────── */
   const activeDrawerWidth = desktopCollapsed ? collapsedDrawerWidth : drawerWidth;
 
-  const drawerContent = (
+  const appDrawerContent = (
     <Box sx={{ px: 1.5, py: 2, height: '100%' }}>
       <Stack direction="row" spacing={1.2} alignItems="center" sx={{ px: 1, mb: 2 }}>
         <Avatar
-          src="https://i.ibb.co/rsPX3fy/Make-X-Logo-Trnasparent-BG.png"
+          src={MEDIA.MAKEX_LOGO}
           alt="MakeX"
           sx={{ width: 34, height: 34 }}
         />
@@ -161,7 +383,7 @@ export default function AppShell({ children }) {
           <Typography variant="subtitle2" noWrap>
             MakeX Dashboard
           </Typography>
-          <Typography variant="caption">WebSocket DApp</Typography>
+          <Typography variant="caption">Web3 Control Center</Typography>
         </Box>
         {!isMobile && (
           <IconButton
@@ -171,14 +393,18 @@ export default function AppShell({ children }) {
             sx={{ ml: 'auto' }}
           >
             <KeyboardDoubleArrowLeftRoundedIcon
-              sx={{ transform: desktopCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 180ms ease' }}
+              sx={{
+                transform: desktopCollapsed ? 'rotate(180deg)' : 'none',
+                transition: 'transform 180ms ease',
+              }}
             />
           </IconButton>
         )}
       </Stack>
       <List sx={{ py: 0.5 }}>
-        {navItems.map((item) => {
-          const selected = pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
+        {appNavItems.map((item) => {
+          const selected =
+            pathname === item.path || (item.path !== '/' && pathname.startsWith(item.path));
           return (
             <ListItemButton
               key={item.path}
@@ -213,7 +439,7 @@ export default function AppShell({ children }) {
           <IconButton
             color="inherit"
             edge="start"
-            onClick={handleDrawerToggle}
+            onClick={() => setMobileOpen((o) => !o)}
             sx={{ mr: 1.5, display: { md: 'none' } }}
             aria-label="Open navigation"
           >
@@ -221,7 +447,7 @@ export default function AppShell({ children }) {
           </IconButton>
           <Stack direction="row" alignItems="center" spacing={1.2} sx={{ flexGrow: 1, minWidth: 0 }}>
             <Avatar
-              src="https://i.ibb.co/rsPX3fy/Make-X-Logo-Trnasparent-BG.png"
+              src={MEDIA.MAKEX_LOGO}
               alt="MakeX"
               sx={{ width: 30, height: 30 }}
             />
@@ -231,40 +457,7 @@ export default function AppShell({ children }) {
           </Stack>
           <Stack direction="row" alignItems="center" spacing={1.2}>
             <ConnectedStatus connected={Boolean(user)} />
-            {user ? (
-              <>
-                <Tooltip title={user.address}>
-                  <Chip
-                    label={`${user.address?.slice(0, 8)}...${user.address?.slice(-6)}`}
-                    size="small"
-                    sx={{ maxWidth: 200 }}
-                  />
-                </Tooltip>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  startIcon={<PowerSettingsNewRoundedIcon />}
-                  onClick={handleLogout}
-                >
-                  Logout
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="contained"
-                startIcon={
-                  isAuthenticating ? (
-                    <CircularProgress color="inherit" size={14} />
-                  ) : (
-                    <AccountBalanceWalletRoundedIcon />
-                  )
-                }
-                onClick={() => unlockPanelManager?.openUnlockPanel()}
-                disabled={isAuthenticating}
-              >
-                Connect Wallet
-              </Button>
-            )}
+            {walletButtons}
           </Stack>
         </Toolbar>
       </AppBar>
@@ -273,14 +466,14 @@ export default function AppShell({ children }) {
         <Drawer
           variant="temporary"
           open={mobileOpen}
-          onClose={handleDrawerToggle}
+          onClose={() => setMobileOpen(false)}
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
             '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
           }}
         >
-          {drawerContent}
+          {appDrawerContent}
         </Drawer>
         <Drawer
           variant="permanent"
@@ -296,7 +489,7 @@ export default function AppShell({ children }) {
           }}
         >
           <Toolbar />
-          {drawerContent}
+          {appDrawerContent}
         </Drawer>
       </Box>
 
