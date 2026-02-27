@@ -93,6 +93,11 @@ class WebSocketService {
         throw new Error('At least one filter must be provided');
       }
 
+      const minAmount = this.normalizeMinAmount(filters.min_amount);
+      if (minAmount !== null && !filters.token) {
+        throw new Error('Token filter is required when min_amount is provided');
+      }
+
       const payload = {
         sender: filters.sender || undefined,
         receiver: filters.receiver || undefined,
@@ -212,6 +217,203 @@ class WebSocketService {
     return this.normalizeValue(transfer?.status) === 'success';
   }
 
+  normalizeMinAmount(value) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+
+    const normalized = String(value).trim();
+    if (!normalized) {
+      return null;
+    }
+
+    if (!/^\d+(\.\d+)?$/.test(normalized)) {
+      return null;
+    }
+
+    return normalized;
+  }
+
+  parseBigIntValue(value) {
+    if (typeof value === 'bigint') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
+        return null;
+      }
+      return BigInt(value);
+    }
+
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    if (/^0x[0-9a-f]+$/i.test(trimmed)) {
+      return BigInt(trimmed);
+    }
+
+    if (/^\d+$/.test(trimmed)) {
+      return BigInt(trimmed);
+    }
+
+    return null;
+  }
+
+  parseAmountToRawUnits(amount, decimals) {
+    const normalizedAmount = this.normalizeMinAmount(amount);
+    const decimalsNumber = Number(decimals);
+
+    if (normalizedAmount === null || !Number.isInteger(decimalsNumber) || decimalsNumber < 0) {
+      return null;
+    }
+
+    const [wholePart, fractionalPart = ''] = normalizedAmount.split('.');
+    if (fractionalPart.length > decimalsNumber) {
+      return null;
+    }
+
+    const paddedFraction = fractionalPart.padEnd(decimalsNumber, '0');
+    const rawString = `${wholePart}${paddedFraction}`.replace(/^0+(?=\d)/, '');
+    return BigInt(rawString || '0');
+  }
+
+  decodeBase64ToString(base64Value) {
+    if (!base64Value || typeof base64Value !== 'string') {
+      return null;
+    }
+
+    try {
+      const decoded = Buffer.from(base64Value, 'base64').toString('utf8').trim();
+      return decoded || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  decodeBase64ToBigInt(base64Value) {
+    if (!base64Value || typeof base64Value !== 'string') {
+      return null;
+    }
+
+    try {
+      const hex = Buffer.from(base64Value, 'base64').toString('hex');
+      if (!hex) {
+        return 0n;
+      }
+      return BigInt(`0x${hex}`);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  parseDecimals(value) {
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      return null;
+    }
+    return parsed;
+  }
+
+  extractTokenTransfers(transfer) {
+    const transfers = [];
+    const decimalsByToken = new Map();
+
+    const addTransfer = ({ token, valueRaw, decimals }) => {
+      const normalizedToken = this.normalizeValue(token);
+      if (!normalizedToken || valueRaw === null) {
+        return;
+      }
+
+      const parsedDecimals = this.parseDecimals(decimals);
+      if (parsedDecimals !== null && !decimalsByToken.has(normalizedToken)) {
+        decimalsByToken.set(normalizedToken, parsedDecimals);
+      }
+
+      transfers.push({
+        token: normalizedToken,
+        valueRaw,
+        decimals: parsedDecimals
+      });
+    };
+
+    const actionTransfers = transfer?.action?.arguments?.transfers;
+    if (Array.isArray(actionTransfers)) {
+      for (const actionTransfer of actionTransfers) {
+        addTransfer({
+          token: actionTransfer?.token || actionTransfer?.identifier,
+          valueRaw: this.parseBigIntValue(actionTransfer?.value ?? actionTransfer?.amount),
+          decimals: actionTransfer?.decimals
+        });
+      }
+    }
+
+    if (Array.isArray(transfer?.operations)) {
+      for (const operation of transfer.operations) {
+        if (this.normalizeValue(operation?.type) !== 'esdt') {
+          continue;
+        }
+        addTransfer({
+          token: operation?.identifier,
+          valueRaw: this.parseBigIntValue(operation?.value),
+          decimals: operation?.decimals
+        });
+      }
+    }
+
+    const collectFromLogs = (events) => {
+      if (!Array.isArray(events)) {
+        return;
+      }
+
+      for (const event of events) {
+        if (this.normalizeValue(event?.identifier) !== 'esdttransfer') {
+          continue;
+        }
+
+        const topics = event?.topics || [];
+        const token = this.decodeBase64ToString(topics[0]);
+        const valueRaw = this.decodeBase64ToBigInt(topics[2]);
+
+        addTransfer({
+          token,
+          valueRaw,
+          decimals: token ? decimalsByToken.get(this.normalizeValue(token)) : null
+        });
+      }
+    };
+
+    collectFromLogs(transfer?.logs?.events);
+
+    if (Array.isArray(transfer?.results)) {
+      for (const result of transfer.results) {
+        collectFromLogs(result?.logs?.events);
+      }
+    }
+
+    return transfers;
+  }
+
+  meetsMinAmount(tokenTransfer, minAmount) {
+    const decimals = tokenTransfer?.decimals;
+    if (decimals === null || decimals === undefined) {
+      return false;
+    }
+
+    const minAmountRaw = this.parseAmountToRawUnits(minAmount, decimals);
+    if (minAmountRaw === null || tokenTransfer.valueRaw === null) {
+      return false;
+    }
+
+    return tokenTransfer.valueRaw >= minAmountRaw;
+  }
+
   matchesFilters(transfer, filters) {
     const normalizedFilters = filters || {};
     const sender = this.normalizeValue(transfer.sender);
@@ -232,14 +434,33 @@ class WebSocketService {
       return false;
     }
 
-    if (normalizedFilters.token) {
-      // Check if transfer involves the specified token
-      const normalizedToken = this.normalizeValue(normalizedFilters.token);
-      const hasToken = transfer.action?.arguments?.transfers?.some(
-        t => this.normalizeValue(t.token) === normalizedToken
-      );
-      if (!hasToken && transfer.value === '0') {
+    const normalizedToken = normalizedFilters.token
+      ? this.normalizeValue(normalizedFilters.token)
+      : null;
+    const minAmount = this.normalizeMinAmount(normalizedFilters.min_amount);
+
+    if (minAmount !== null && !normalizedToken) {
+      return false;
+    }
+
+    if (normalizedToken || minAmount !== null) {
+      const tokenTransfers = this.extractTokenTransfers(transfer);
+      const relevantTransfers = normalizedToken
+        ? tokenTransfers.filter((tokenTransfer) => tokenTransfer.token === normalizedToken)
+        : tokenTransfers;
+
+      if (normalizedToken && relevantTransfers.length === 0) {
         return false;
+      }
+
+      if (minAmount !== null) {
+        const hasMatchingAmount = relevantTransfers.some((tokenTransfer) =>
+          this.meetsMinAmount(tokenTransfer, minAmount)
+        );
+
+        if (!hasMatchingAmount) {
+          return false;
+        }
       }
     }
 

@@ -32,7 +32,7 @@ export default function CreateSubscriptionPage() {
     name: '',
     webhook_url: '',
     network: 'mainnet',
-    filters: { sender: '', receiver: '', function: '', token: '', address: '' }
+    filters: { sender: '', receiver: '', function: '', token: '', min_amount: '', address: '' }
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -55,7 +55,16 @@ export default function CreateSubscriptionPage() {
             name: sub.name,
             webhook_url: sub.webhook_url,
             network: sub.network,
-            filters: typeof sub.filters === 'object' ? sub.filters : { sender: '', receiver: '', function: '', token: '', address: '' }
+            filters: typeof sub.filters === 'object'
+              ? {
+                sender: sub.filters.sender || '',
+                receiver: sub.filters.receiver || '',
+                function: sub.filters.function || '',
+                token: sub.filters.token || '',
+                min_amount: sub.filters.min_amount || '',
+                address: sub.filters.address || ''
+              }
+              : { sender: '', receiver: '', function: '', token: '', min_amount: '', address: '' }
           });
         })
         .catch(() => setLoadError('Unable to load this subscription.'))
@@ -69,6 +78,7 @@ export default function CreateSubscriptionPage() {
     if (form.filters.receiver) f.receiver = form.filters.receiver;
     if (form.filters.function) f.function = form.filters.function;
     if (form.filters.token) f.token = form.filters.token;
+    if (form.filters.min_amount) f.min_amount = form.filters.min_amount;
     if (form.filters.address) f.address = form.filters.address;
     return f;
   };
@@ -185,6 +195,16 @@ export default function CreateSubscriptionPage() {
                   label="Token"
                   value={form.filters.token}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Min Amount"
+                  type="number"
+                  value={form.filters.min_amount}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, min_amount: e.target.value } })}
+                  inputProps={{ min: 0, step: 'any' }}
+                  helperText="Optional. Requires token filter. Enter token units, e.g. 50000."
                 />
               </Grid>
               <Grid item xs={12} md={4}>

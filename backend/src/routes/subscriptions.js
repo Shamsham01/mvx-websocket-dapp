@@ -6,6 +6,40 @@ const websocketService = require('../services/websocketService');
 const webhookService = require('../services/webhookService');
 const logger = require('../utils/logger');
 
+const hasFilterValue = (value) => {
+  if (value === undefined || value === null) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+  return true;
+};
+
+const validateFilters = (filters) => {
+  if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
+    return 'Filters must be a valid object';
+  }
+
+  const filterKeys = Object.keys(filters).filter((key) => hasFilterValue(filters[key]));
+  if (filterKeys.length === 0) {
+    return 'At least one filter must be provided';
+  }
+
+  if (hasFilterValue(filters.min_amount)) {
+    const minAmount = Number(filters.min_amount);
+    if (!Number.isFinite(minAmount) || minAmount <= 0) {
+      return 'min_amount must be a positive number';
+    }
+
+    if (!hasFilterValue(filters.token)) {
+      return 'token filter is required when min_amount is provided';
+    }
+  }
+
+  return null;
+};
+
 // Authentication middleware
 const authenticate = async (req, res, next) => {
   try {
@@ -98,9 +132,9 @@ router.post('/', authenticate, async (req, res) => {
     }
 
     // Validate filters
-    const filterKeys = Object.keys(filters).filter(key => filters[key]);
-    if (filterKeys.length === 0) {
-      return res.status(400).json({ error: 'At least one filter must be provided' });
+    const filtersError = validateFilters(filters);
+    if (filtersError) {
+      return res.status(400).json({ error: filtersError });
     }
 
     // Validate network
@@ -194,9 +228,9 @@ router.put('/:id', authenticate, async (req, res) => {
 
     // Validate filters if provided
     if (filters !== undefined) {
-      const filterKeys = Object.keys(filters).filter(key => filters[key]);
-      if (filterKeys.length === 0) {
-        return res.status(400).json({ error: 'At least one filter must be provided' });
+      const filtersError = validateFilters(filters);
+      if (filtersError) {
+        return res.status(400).json({ error: filtersError });
       }
     }
 

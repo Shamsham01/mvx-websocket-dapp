@@ -1,7 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import GetAppRoundedIcon from '@mui/icons-material/GetAppRounded';
 import CellTowerRoundedIcon from '@mui/icons-material/CellTowerRounded';
 import { Link as RouterLink } from 'react-router-dom';
@@ -15,12 +14,6 @@ function scrollTo(id) {
 
 export default function HeroSection({ onOpenTrial }) {
   const { user } = useAuth();
-  const videoRef = useRef(null);
-  const [playing, setPlaying] = useState(false);
-
-  const handlePlay = () => {
-    videoRef.current?.play();
-  };
 
   const handleTrialClick = () => {
     if (!user) {
@@ -90,32 +83,31 @@ export default function HeroSection({ onOpenTrial }) {
         </Stack>
       </Container>
 
-      <Container maxWidth="lg">
+      <Box
+        sx={{
+          width: '100%',
+          maxWidth: '100%',
+          overflow: 'hidden',
+          mt: { xs: 1, md: 2 },
+        }}
+      >
         <Box
           sx={{
             position: 'relative',
-            borderRadius: 3,
             overflow: 'hidden',
             border: (t) => `1px solid ${t.palette.divider}`,
             background: (t) => alpha(t.palette.background.paper, 0.6),
-            mx: 'auto',
-            maxWidth: 900,
-            '& video::-webkit-media-controls-timeline': { display: 'none' },
-            '& video::-webkit-media-controls-current-time-display': { display: 'none' },
-            '& video::-webkit-media-controls-time-remaining-display': { display: 'none' },
           }}
         >
           <video
-            ref={videoRef}
             src={MEDIA.HERO_VIDEO}
-            controls={playing}
-            controlsList="nodownload noplaybackrate"
+            autoPlay
+            muted
+            loop
+            controls={false}
             disablePictureInPicture
             playsInline
-            preload="metadata"
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
+            preload="auto"
             style={{
               width: '100%',
               display: 'block',
@@ -124,72 +116,8 @@ export default function HeroSection({ onOpenTrial }) {
               backgroundColor: '#070b14',
             }}
           />
-          {!playing && (
-            <Box
-              onClick={handlePlay}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => e.key === 'Enter' && handlePlay()}
-              aria-label="Play presentation video"
-              sx={{
-                position: 'absolute',
-                inset: 0,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                background: 'rgba(7, 11, 20, 0.45)',
-                transition: 'background 200ms ease',
-                '&:hover': { background: 'rgba(7, 11, 20, 0.3)' },
-                '&:hover .play-icon': { transform: 'scale(1.08)' },
-              }}
-            >
-              <Box
-                className="play-icon"
-                sx={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: (t) => alpha(t.palette.primary.main, 0.9),
-                  boxShadow: '0 8px 32px rgba(70, 217, 255, 0.3)',
-                  transition: 'transform 200ms ease',
-                }}
-              >
-                <PlayArrowRoundedIcon sx={{ fontSize: 40, color: '#05111d' }} />
-              </Box>
-            </Box>
-          )}
         </Box>
-
-        <Stack
-          direction="row"
-          spacing={0.8}
-          justifyContent="center"
-          alignItems="center"
-          flexWrap="wrap"
-          useFlexGap
-          sx={{ mt: 3 }}
-        >
-          <Typography variant="caption" color="text.secondary">
-            Wallet login:
-          </Typography>
-          {['xPortal', 'Ledger', 'Web Wallet'].map((w, i) => (
-            <React.Fragment key={w}>
-              {i > 0 && (
-                <Typography variant="caption" color="text.secondary">
-                  {'\u2022'}
-                </Typography>
-              )}
-              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                {w}
-              </Typography>
-            </React.Fragment>
-          ))}
-        </Stack>
-      </Container>
+      </Box>
     </Box>
   );
 }

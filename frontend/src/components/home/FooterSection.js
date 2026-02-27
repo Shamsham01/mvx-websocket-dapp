@@ -120,7 +120,7 @@ export default function FooterSection() {
                 color="text.secondary"
                 underline="hover"
               >
-                MultiversX Docs
+                MakeX Docs
               </Link>
               <Link
                 href={DOCS.MAKE_AI_AGENTS}

@@ -33,5 +33,5 @@ export const DOCS = {
   LITEPAPER: 'https://hodltokenclub.gitbook.io/hodl-token-club-litepaper-v2',
   MAKE_AI_AGENTS: 'https://www.make.com/en/ai-agents',
   MVX_WEBSITE: 'https://multiversx.com/',
-  MAKEX_DOCS: 'https://docs.multiversx.com/',
+  MAKEX_DOCS: 'https://hodltokenclub.gitbook.io/makex_web3',
 };
