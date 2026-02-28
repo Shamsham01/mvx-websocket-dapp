@@ -359,9 +359,11 @@ class WebSocketService {
         if (this.normalizeValue(operation?.type) !== 'esdt') {
           continue;
         }
+        const tokenId = operation?.identifier ?? operation?.tokenIdentifier ?? operation?.token;
+        const valueRaw = this.parseBigIntValue(operation?.value ?? operation?.valueNum);
         addTransfer({
-          token: operation?.identifier,
-          valueRaw: this.parseBigIntValue(operation?.value),
+          token: tokenId,
+          valueRaw,
           decimals: operation?.decimals
         });
       }
@@ -446,7 +448,10 @@ class WebSocketService {
     if (normalizedToken || minAmount !== null) {
       const tokenTransfers = this.extractTokenTransfers(transfer);
       const relevantTransfers = normalizedToken
-        ? tokenTransfers.filter((tokenTransfer) => tokenTransfer.token === normalizedToken)
+        ? tokenTransfers.filter((tokenTransfer) =>
+            tokenTransfer.token === normalizedToken ||
+            tokenTransfer.token.startsWith(normalizedToken + '-')
+          )
         : tokenTransfers;
 
       if (normalizedToken && relevantTransfers.length === 0) {

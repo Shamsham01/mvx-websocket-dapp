@@ -166,6 +166,28 @@ REACT_APP_ENV=development
 }
 ```
 
+### REWARD Buys on OneDEX
+To report REWARD token buys on OneDEX, use the OneDEX Aggregator address and swap function:
+
+```json
+{
+  "name": "REWARD Buys on OneDEX",
+  "webhook_url": "https://your-webhook.com/reward-buys",
+  "filters": {
+    "receiver": "erd1qqqqqqqqqqqqqpgqn7wy983tdh5katf5yn5nl2gcdflf4azh6jtsggjx9a",
+    "function": "swap",
+    "token": "REWARD-cf6eac",
+    "min_amount": "100"
+  },
+  "network": "mainnet"
+}
+```
+
+- **receiver**: OneDEX Aggregator contract
+- **function**: `swap` (top-level call)
+- **token**: `REWARD-cf6eac` (full ID) or `REWARD` (ticker match)
+- **min_amount** (optional): Minimum REWARD received in human units (e.g. `100` = 100 REWARD). Requires `token` filter.
+
 ## 🔐 Authentication Flow
 
 1. **User connects wallet** using xPortal or MultiversX wallet

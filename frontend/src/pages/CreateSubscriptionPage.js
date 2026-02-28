@@ -195,6 +195,8 @@ export default function CreateSubscriptionPage() {
                   label="Token"
                   value={form.filters.token}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
+                  placeholder="REWARD-cf6eac or REWARD"
+                  helperText="Token ID. Use ticker (e.g. REWARD) or full ID (e.g. REWARD-cf6eac)."
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -204,7 +206,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.min_amount}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, min_amount: e.target.value } })}
                   inputProps={{ min: 0, step: 'any' }}
-                  helperText="Optional. Requires token filter. Enter token units, e.g. 50000."
+                  helperText="Optional. Requires token filter. Enter human units (e.g. 1000 for 1000 REWARD)."
                 />
               </Grid>
               <Grid item xs={12} md={4}>
