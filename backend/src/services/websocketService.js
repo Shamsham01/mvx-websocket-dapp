@@ -94,10 +94,11 @@ class WebSocketService {
       }
 
       const minAmount = this.normalizeMinAmount(filters.min_amount);
-      if (minAmount !== null && !filters.token) {
-        throw new Error('Token filter is required when min_amount is provided');
+      if (minAmount !== null && !filters.token && !filters.output_token) {
+        throw new Error('Token or output_token filter is required when min_amount is provided');
       }
 
+      // MultiversX API token = input/payment token (e.g. EGLD). output_token is backend-only.
       const payload = {
         sender: filters.sender || undefined,
         receiver: filters.receiver || undefined,
@@ -439,25 +440,27 @@ class WebSocketService {
       return false;
     }
 
-    const normalizedToken = normalizedFilters.token
-      ? this.normalizeValue(normalizedFilters.token)
+    // token = input/payment token (MultiversX API filters server-side)
+    // output_token = output/received token (backend-only, for swaps / copy trading)
+    const normalizedOutputToken = normalizedFilters.output_token
+      ? this.normalizeValue(normalizedFilters.output_token)
       : null;
     const minAmount = this.normalizeMinAmount(normalizedFilters.min_amount);
 
-    if (minAmount !== null && !normalizedToken) {
+    if (minAmount !== null && !normalizedOutputToken) {
       return false;
     }
 
-    if (normalizedToken || minAmount !== null) {
+    if (normalizedOutputToken || minAmount !== null) {
       const tokenTransfers = this.extractTokenTransfers(transfer);
-      const relevantTransfers = normalizedToken
+      const relevantTransfers = normalizedOutputToken
         ? tokenTransfers.filter((tokenTransfer) =>
-            tokenTransfer.token === normalizedToken ||
-            tokenTransfer.token.startsWith(normalizedToken + '-')
+            tokenTransfer.token === normalizedOutputToken ||
+            tokenTransfer.token.startsWith(normalizedOutputToken + '-')
           )
         : tokenTransfers;
 
-      if (normalizedToken && relevantTransfers.length === 0) {
+      if (normalizedOutputToken && relevantTransfers.length === 0) {
         return false;
       }
 

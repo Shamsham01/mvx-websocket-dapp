@@ -32,7 +32,7 @@ export default function CreateSubscriptionPage() {
     name: '',
     webhook_url: '',
     network: 'mainnet',
-    filters: { sender: '', receiver: '', function: '', token: '', min_amount: '', address: '' }
+    filters: { sender: '', receiver: '', function: '', token: '', output_token: '', min_amount: '', address: '' }
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -61,10 +61,11 @@ export default function CreateSubscriptionPage() {
                 receiver: sub.filters.receiver || '',
                 function: sub.filters.function || '',
                 token: sub.filters.token || '',
+                output_token: sub.filters.output_token || '',
                 min_amount: sub.filters.min_amount || '',
                 address: sub.filters.address || ''
               }
-              : { sender: '', receiver: '', function: '', token: '', min_amount: '', address: '' }
+              : { sender: '', receiver: '', function: '', token: '', output_token: '', min_amount: '', address: '' }
           });
         })
         .catch(() => setLoadError('Unable to load this subscription.'))
@@ -78,6 +79,7 @@ export default function CreateSubscriptionPage() {
     if (form.filters.receiver) f.receiver = form.filters.receiver;
     if (form.filters.function) f.function = form.filters.function;
     if (form.filters.token) f.token = form.filters.token;
+    if (form.filters.output_token) f.output_token = form.filters.output_token;
     if (form.filters.min_amount) f.min_amount = form.filters.min_amount;
     if (form.filters.address) f.address = form.filters.address;
     return f;
@@ -88,7 +90,7 @@ export default function CreateSubscriptionPage() {
     setError('');
     const filters = buildFilters();
     if (Object.keys(filters).length === 0) {
-      setError('At least one filter is required (sender, receiver, function, token, or address)');
+      setError('At least one filter is required (sender, receiver, function, input token, output token, or address)');
       return;
     }
     if (!form.name || !form.webhook_url) {
@@ -192,11 +194,20 @@ export default function CreateSubscriptionPage() {
               </Grid>
               <Grid item xs={12} md={4}>
                 <TextField
-                  label="Token"
+                  label="Input Token"
                   value={form.filters.token}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
+                  placeholder="EGLD or WEGLD-bd4d79"
+                  helperText="Payment token (MultiversX API). E.g. EGLD for swaps where user pays EGLD."
+                />
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <TextField
+                  label="Output Token"
+                  value={form.filters.output_token}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, output_token: e.target.value } })}
                   placeholder="REWARD-cf6eac or REWARD"
-                  helperText="Token ID. Use ticker (e.g. REWARD) or full ID (e.g. REWARD-cf6eac)."
+                  helperText="Received token (backend filter). Ideal for swaps, copy trading."
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -206,7 +217,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.min_amount}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, min_amount: e.target.value } })}
                   inputProps={{ min: 0, step: 'any' }}
-                  helperText="Optional. Requires token filter. Enter human units (e.g. 1000 for 1000 REWARD)."
+                  helperText="Optional. Requires output token. Min received (e.g. 1000 REWARD)."
                 />
               </Grid>
               <Grid item xs={12} md={4}>

@@ -32,8 +32,8 @@ const validateFilters = (filters) => {
       return 'min_amount must be a positive number';
     }
 
-    if (!hasFilterValue(filters.token)) {
-      return 'token filter is required when min_amount is provided';
+    if (!hasFilterValue(filters.token) && !hasFilterValue(filters.output_token)) {
+      return 'token or output_token filter is required when min_amount is provided';
     }
   }
 

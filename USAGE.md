@@ -166,8 +166,8 @@ REACT_APP_ENV=development
 }
 ```
 
-### REWARD Buys on OneDEX
-To report REWARD token buys on OneDEX, use the OneDEX Aggregator address and swap function:
+### REWARD Buys on OneDEX (Copy Trading)
+Use **output_token** to track when someone receives REWARD (backend filter). Combine with receiver + function:
 
 ```json
 {
@@ -176,7 +176,7 @@ To report REWARD token buys on OneDEX, use the OneDEX Aggregator address and swa
   "filters": {
     "receiver": "erd1qqqqqqqqqqqqqpgqn7wy983tdh5katf5yn5nl2gcdflf4azh6jtsggjx9a",
     "function": "swap",
-    "token": "REWARD-cf6eac",
+    "output_token": "REWARD-cf6eac",
     "min_amount": "100"
   },
   "network": "mainnet"
@@ -185,8 +185,8 @@ To report REWARD token buys on OneDEX, use the OneDEX Aggregator address and swa
 
 - **receiver**: OneDEX Aggregator contract
 - **function**: `swap` (top-level call)
-- **token**: `REWARD-cf6eac` (full ID) or `REWARD` (ticker match)
-- **min_amount** (optional): Minimum REWARD received in human units (e.g. `100` = 100 REWARD). Requires `token` filter.
+- **output_token**: Token received (backend filter). `REWARD-cf6eac` or `REWARD` for ticker match.
+- **min_amount** (optional): Minimum REWARD received. Requires `output_token`.
 
 ## 🔐 Authentication Flow
 
@@ -290,7 +290,8 @@ If you never see "Received X transfer(s)", the MultiversX WebSocket may not be s
 
 **4. MultiversX WebSocket behavior**
 
-The MultiversX API filters server-side by `receiver`, `function`, `sender`, `address`. The `token` and `min_amount` filters are applied **client-side** after receiving transfers. If the API does not support `token` in its subscription payload, you may receive all swap txs to OneDEX and filter locally — ensure your deployment has the latest code with the token filter fix.
+- **token** (Input Token): Sent to MultiversX API. Filters by payment/input token (e.g. EGLD).
+- **output_token**: Backend-only. Filters by received token (e.g. REWARD). Ideal for swaps and copy trading.
 
 **5. Test with manual webhook**
 

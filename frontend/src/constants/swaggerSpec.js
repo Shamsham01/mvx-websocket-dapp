@@ -44,8 +44,9 @@ const swaggerSpec = {
         example: {
           sender: 'erd1...',
           receiver: 'erd1...',
-          token: 'WEGLD-bd4d79',
-          function: 'ESDTTransfer'
+          token: 'EGLD',
+          output_token: 'REWARD-cf6eac',
+          function: 'swap'
         }
       },
       Subscription: {
