@@ -160,9 +160,6 @@ class WebSocketService {
         return;
       }
 
-      logger.info(`Received ${data.transfers.length} transfer(s) from ${network}`);
-
-      // Get all active subscriptions for this network
       const subscriptions = await database.query(`
         SELECT s.*, u.address as user_address 
         FROM subscriptions s
@@ -170,12 +167,12 @@ class WebSocketService {
         WHERE s.network = ? AND s.is_active = true
       `, [network]);
 
+      logger.info(`Received ${data.transfers.length} transfer(s) from ${network}, ${subscriptions.length} active subscription(s)`);
+
       if (subscriptions.length === 0) {
-        logger.debug(`No active subscriptions for ${network}, skipping ${data.transfers.length} transfer(s)`);
         return;
       }
 
-      // Process each transfer for each subscription
       for (const transfer of data.transfers) {
         if (!this.shouldProcessTransfer(transfer)) {
           logger.debug(
@@ -192,6 +189,15 @@ class WebSocketService {
             logger.info(`Transfer ${transfer?.txHash || 'unknown'} matched subscription ${subscription.id} (${subscription.name})`);
             deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
           }
+        }
+
+        if (deliveryTasks.length === 0 && subscriptions.length > 0) {
+          const tokens = this.extractTokenTransfers(transfer);
+          const tokenIds = tokens.map((t) => t.token).join(', ') || 'none';
+          const txId = transfer?.txHash || transfer?.hash || 'unknown';
+          logger.info(
+            `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, function=${this.transferFunctionName(transfer)}, tokens in tx: ${tokenIds})`
+          );
         }
 
         if (deliveryTasks.length > 0) {

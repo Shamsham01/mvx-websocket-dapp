@@ -270,12 +270,14 @@ docker-compose ps
 **1. Check backend logs (Render / PaaS dashboard)**
 
 Look for these log lines:
-- `Received X transfer(s) from mainnet` — WebSocket is receiving data
-- `Transfer <txHash> matched subscription X` — Transfer passed filters and webhook was sent
+- `Received X transfer(s) from mainnet, Y active subscription(s)` — WebSocket receiving; Y must be > 0
+- `Found X active subscriptions to initialize` — On startup; X must be > 0
+- `Transfer <txHash> matched subscription X` — Transfer passed filters, webhook sent
+- `Transfer <txHash> did not match any subscription (receiver=..., function=..., tokens in tx: ...)` — Why it didn't match
 - `Delivering webhook for subscription X` — Webhook delivery attempted
 - `WebSocket connected to mainnet` — Connection is active
 
-If you never see "Received X transfer(s)", the MultiversX WebSocket may not be sending your tx, or the backend may not be connected.
+If `Y active subscription(s)` is 0, subscriptions were not loaded (check DB, is_active). If `tokens in tx: none`, the WebSocket transfer format may lack operations.
 
 **2. Check webhook delivery history**
 
