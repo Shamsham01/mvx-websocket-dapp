@@ -166,18 +166,17 @@ REACT_APP_ENV=development
 }
 ```
 
-### REWARD Buys on OneDEX (Copy Trading)
-Use **output_token** to track when someone receives REWARD (backend filter). Combine with receiver + function:
+### Swaps on OneDEX (Receiver + Function + Token)
+Use MultiversX API filters only. Example for swaps where user pays EGLD:
 
 ```json
 {
-  "name": "REWARD Buys on OneDEX",
-  "webhook_url": "https://your-webhook.com/reward-buys",
+  "name": "OneDEX Swaps (EGLD)",
+  "webhook_url": "https://your-webhook.com/onedex-swaps",
   "filters": {
     "receiver": "erd1qqqqqqqqqqqqqpgqn7wy983tdh5katf5yn5nl2gcdflf4azh6jtsggjx9a",
     "function": "swap",
-    "output_token": "REWARD-cf6eac",
-    "min_amount": "100"
+    "token": "EGLD"
   },
   "network": "mainnet"
 }
@@ -185,8 +184,7 @@ Use **output_token** to track when someone receives REWARD (backend filter). Com
 
 - **receiver**: OneDEX Aggregator contract
 - **function**: `swap` (top-level call)
-- **output_token**: Token received (backend filter). `REWARD-cf6eac` or `REWARD` for ticker match.
-- **min_amount** (optional): Minimum REWARD received. Requires `output_token`.
+- **token**: Payment/input token (MultiversX API filter)
 
 ## 🔐 Authentication Flow
 
@@ -273,11 +271,11 @@ Look for these log lines:
 - `Received X transfer(s) from mainnet, Y active subscription(s)` — WebSocket receiving; Y must be > 0
 - `Found X active subscriptions to initialize` — On startup; X must be > 0
 - `Transfer <txHash> matched subscription X` — Transfer passed filters, webhook sent
-- `Transfer <txHash> did not match any subscription (receiver=..., function=..., tokens in tx: ...)` — Why it didn't match
+- `Transfer <txHash> did not match any subscription (receiver=..., function=...)` — Why it didn't match
 - `Delivering webhook for subscription X` — Webhook delivery attempted
 - `WebSocket connected to mainnet` — Connection is active
 
-If `Y active subscription(s)` is 0, subscriptions were not loaded (check DB, is_active). If `tokens in tx: none`, the WebSocket transfer format may lack operations.
+If `Y active subscription(s)` is 0, subscriptions were not loaded (check DB, is_active).
 
 **2. Check webhook delivery history**
 
@@ -292,8 +290,7 @@ If `Y active subscription(s)` is 0, subscriptions were not loaded (check DB, is_
 
 **4. MultiversX WebSocket behavior**
 
-- **token** (Input Token): Sent to MultiversX API. Filters by payment/input token (e.g. EGLD).
-- **output_token**: Backend-only. Filters by received token (e.g. REWARD). Ideal for swaps and copy trading.
+Only MultiversX API filters are used: **sender**, **receiver**, **relayer**, **function**, **token**, **address**. Webhooks are delivered only for transfers with **status=success**.
 
 **5. Test with manual webhook**
 

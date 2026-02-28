@@ -26,17 +26,6 @@ const validateFilters = (filters) => {
     return 'At least one filter must be provided';
   }
 
-  if (hasFilterValue(filters.min_amount)) {
-    const minAmount = Number(filters.min_amount);
-    if (!Number.isFinite(minAmount) || minAmount <= 0) {
-      return 'min_amount must be a positive number';
-    }
-
-    if (!hasFilterValue(filters.token) && !hasFilterValue(filters.output_token)) {
-      return 'token or output_token filter is required when min_amount is provided';
-    }
-  }
-
   return null;
 };
 
