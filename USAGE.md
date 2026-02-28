@@ -265,6 +265,41 @@ docker-compose ps
 
 ## 🚨 Troubleshooting
 
+### WebSocket Not Triggering (No webhook, nothing in Supabase)
+
+**1. Check backend logs (Render / PaaS dashboard)**
+
+Look for these log lines:
+- `Received X transfer(s) from mainnet` — WebSocket is receiving data
+- `Transfer <txHash> matched subscription X` — Transfer passed filters and webhook was sent
+- `Delivering webhook for subscription X` — Webhook delivery attempted
+- `WebSocket connected to mainnet` — Connection is active
+
+If you never see "Received X transfer(s)", the MultiversX WebSocket may not be sending your tx, or the backend may not be connected.
+
+**2. Check webhook delivery history**
+
+- **API**: `GET /api/webhooks/deliveries` (with `Authorization: Bearer <JWT>`)
+- **Per-subscription stats**: `GET /api/webhooks/stats/:subscriptionId`
+- **Test webhook**: `POST /api/webhooks/test/:subscriptionId` — sends a fake transfer to verify Make.com receives it
+
+**3. Verify subscription is active**
+
+- Subscriptions list: ensure "Buy REWARD" has the toggle ON
+- After creating/editing, the backend re-subscribes to the WebSocket; a restart may be needed
+
+**4. MultiversX WebSocket behavior**
+
+The MultiversX API filters server-side by `receiver`, `function`, `sender`, `address`. The `token` and `min_amount` filters are applied **client-side** after receiving transfers. If the API does not support `token` in its subscription payload, you may receive all swap txs to OneDEX and filter locally — ensure your deployment has the latest code with the token filter fix.
+
+**5. Test with manual webhook**
+
+Use the test endpoint to confirm Make.com → Supabase works:
+```bash
+curl -X POST https://your-api.com/api/webhooks/test/YOUR_SUBSCRIPTION_ID \
+  -H "Authorization: Bearer YOUR_JWT"
+```
+
 ### WebSocket Connection Issues
 1. Check MultiversX API status
 2. Verify network (mainnet/testnet/devnet)
@@ -274,8 +309,8 @@ docker-compose ps
 ### Webhook Delivery Failures
 1. Validate webhook URL
 2. Check webhook server logs
-3. Review `webhook_logs` table
-4. Test with manual trigger
+3. Review `webhook_logs` table via `GET /api/webhooks/deliveries`
+4. Test with manual trigger: `POST /api/webhooks/test/:subscriptionId`
 
 ### Database Issues
 1. Check file permissions for `data/` directory

@@ -170,6 +170,7 @@ class WebSocketService {
       `, [network]);
 
       if (subscriptions.length === 0) {
+        logger.debug(`No active subscriptions for ${network}, skipping ${data.transfers.length} transfer(s)`);
         return;
       }
 
@@ -185,7 +186,9 @@ class WebSocketService {
         const deliveryTasks = [];
 
         for (const subscription of subscriptions) {
-          if (this.matchesFilters(transfer, parseJson(subscription.filters))) {
+          const filters = parseJson(subscription.filters);
+          if (this.matchesFilters(transfer, filters)) {
+            logger.info(`Transfer ${transfer?.txHash || 'unknown'} matched subscription ${subscription.id} (${subscription.name})`);
             deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
           }
         }
