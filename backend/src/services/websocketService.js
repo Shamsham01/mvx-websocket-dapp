@@ -188,9 +188,14 @@ class WebSocketService {
 
         if (deliveryTasks.length === 0 && subscriptions.length > 0) {
           const txId = transfer?.txHash || transfer?.hash || 'unknown';
+          const fn = this.transferFunctionName(transfer);
           logger.info(
-            `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, function=${this.transferFunctionName(transfer)})`
+            `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, function=${fn})`
           );
+          subscriptions.forEach((s) => {
+            const f = parseJson(s.filters);
+            logger.debug(`  Sub ${s.id} filters: function=${f?.function || '(any)'}, receiver=${f?.receiver || '(any)'}`);
+          });
         }
 
         if (deliveryTasks.length > 0) {
@@ -207,8 +212,13 @@ class WebSocketService {
   }
 
   transferFunctionName(transfer) {
+    // MultiversX API may expose function at different levels:
+    // - transfer.function (top-level, main tx)
+    // - transfer.action.name (e.g. "transfer", "swap")
+    // - transfer.action.arguments.functionName (SCRs, DEX swaps)
     return (
       transfer.function ||
+      transfer.action?.arguments?.functionName ||
       transfer.action?.name ||
       transfer.action?.arguments?.function ||
       null

@@ -186,6 +186,22 @@ Use MultiversX API filters only. Example for swaps where user pays EGLD:
 - **function**: `swap` (top-level call)
 - **token**: Payment/input token (MultiversX API filter)
 
+## 📡 WebSocket Data Flow & Filtering
+
+**How it works:**
+1. **MultiversX WebSocket** sends `customTransferUpdate` events (raw blockchain transfers).
+2. **App filters** each transfer:
+   - **Status**: Only `status=success` transfers are processed (failed/pending are skipped).
+   - **Per-subscription**: Each transfer is checked against each subscription's filters (function, receiver, sender, token, address).
+3. **Webhook delivery**: Only transfers that match a subscription's filters are sent to that subscription's webhook URL.
+
+**Function name extraction:** The app reads the function from multiple transfer fields:
+- `transfer.function` (top-level)
+- `transfer.action.arguments.functionName` (SCRs, DEX swaps)
+- `transfer.action.name` (fallback)
+
+**Note:** Multiple subscriptions share one WebSocket connection per network. The MultiversX API may merge or replace server-side filters. Client-side filtering ensures each subscription only receives events matching its filters.
+
 ## 🔐 Authentication Flow
 
 1. **User connects wallet** using xPortal or MultiversX wallet
