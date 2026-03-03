@@ -195,12 +195,17 @@ Use MultiversX API filters only. Example for swaps where user pays EGLD:
    - **Per-subscription**: Each transfer is checked against each subscription's filters (function, receiver, sender, token, address).
 3. **Webhook delivery**: Only transfers that match a subscription's filters are sent to that subscription's webhook URL.
 
+**Function filter (client-side only):** The MultiversX API's `function` filter does not work reliably when combined with address/sender/receiver (e.g. returns no events for `{ address, function: "swap" }`). The app therefore:
+- Sends only `address`, `sender`, `receiver`, `token`, `relayer` to the API
+- Filters by `function` **client-side** in `matchesFilters()`
+- **Requirement:** `function` must be combined with at least one of: `address`, `sender`, `receiver`, `token`
+
 **Function name extraction:** The app reads the function from multiple transfer fields:
 - `transfer.function` (top-level)
 - `transfer.action.arguments.functionName` (SCRs, DEX swaps)
 - `transfer.action.name` (fallback)
 
-**Note:** Multiple subscriptions share one WebSocket connection per network. The MultiversX API may merge or replace server-side filters. Client-side filtering ensures each subscription only receives events matching its filters.
+**Note:** Multiple subscriptions share one WebSocket connection per network. Client-side filtering ensures each subscription only receives events matching its filters.
 
 ## 🔐 Authentication Flow
 

@@ -93,18 +93,27 @@ class WebSocketService {
         throw new Error('At least one filter must be provided');
       }
 
-      // MultiversX API filters only (sender, receiver, relayer, function, token, address)
+      // MultiversX API filters: sender, receiver, relayer, token, address (NOT function)
+      // The API's function filter is unreliable when combined with address/sender/receiver
+      // (e.g. DEX swaps often produce SCRs with function "exchange" not "swap").
+      // We omit function from the API payload and filter by function client-side in matchesFilters().
       const payload = {
         sender: filters.sender || undefined,
         receiver: filters.receiver || undefined,
         relayer: filters.relayer || undefined,
-        function: filters.function || undefined,
         token: filters.token || undefined,
         address: filters.address || undefined
       };
 
       // Remove undefined values
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+      // API requires at least one filter; we omit function (filtered client-side)
+      if (Object.keys(payload).length === 0) {
+        throw new Error(
+          'Function filter must be combined with at least one of: address, sender, receiver, token'
+        );
+      }
 
       // Validate: address cannot be combined with sender/receiver/relayer
       if (payload.address && (payload.sender || payload.receiver || payload.relayer)) {
