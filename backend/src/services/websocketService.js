@@ -178,9 +178,15 @@ class WebSocketService {
       }
 
       for (const transfer of data.transfers) {
+        const txId = transfer?.txHash || transfer?.hash || 'unknown';
+        const fn = this.transferFunctionName(transfer);
+        logger.info(
+          `Transfer: txHash=${txId} sender=${transfer?.sender} receiver=${transfer?.receiver} function=${fn} status=${transfer?.status} type=${transfer?.type}`
+        );
+
         if (!this.shouldProcessTransfer(transfer)) {
-          logger.debug(
-            `Skipping non-success transfer ${transfer?.txHash || 'unknown-tx'} with status ${transfer?.status || 'unknown'}`
+          logger.info(
+            `Skipping non-success transfer ${txId} (status=${transfer?.status || 'unknown'})`
           );
           continue;
         }
@@ -190,20 +196,20 @@ class WebSocketService {
         for (const subscription of subscriptions) {
           const filters = parseJson(subscription.filters);
           if (this.matchesFilters(transfer, filters)) {
-            logger.info(`Transfer ${transfer?.txHash || 'unknown'} matched subscription ${subscription.id} (${subscription.name})`);
+            logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
             deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
           }
         }
 
         if (deliveryTasks.length === 0 && subscriptions.length > 0) {
-          const txId = transfer?.txHash || transfer?.hash || 'unknown';
-          const fn = this.transferFunctionName(transfer);
           logger.info(
             `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, function=${fn})`
           );
           subscriptions.forEach((s) => {
             const f = parseJson(s.filters);
-            logger.debug(`  Sub ${s.id} filters: function=${f?.function || '(any)'}, receiver=${f?.receiver || '(any)'}`);
+            logger.info(
+              `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}`
+            );
           });
         }
 
