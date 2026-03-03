@@ -191,7 +191,7 @@ Use MultiversX API filters only. Example for swaps where user pays EGLD:
 **How it works:**
 1. **MultiversX WebSocket** sends `customTransferUpdate` events (raw blockchain transfers).
 2. **App filters** each transfer:
-   - **Status**: Only `status=success` transfers are processed (failed/pending are skipped).
+   - **Status**: `success` and `pending` are processed; `fail` and `invalid` are skipped. The API often sends transfers when they first appear (mempool), so `pending` is accepted.
    - **Per-subscription**: Each transfer is checked against each subscription's filters (function, receiver, sender, token, address).
 3. **Webhook delivery**: Only transfers that match a subscription's filters are sent to that subscription's webhook URL.
 

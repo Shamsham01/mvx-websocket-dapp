@@ -241,8 +241,11 @@ class WebSocketService {
   }
 
   shouldProcessTransfer(transfer) {
-    // Webhooks should only be delivered once transaction is finalized as success.
-    return this.normalizeValue(transfer?.status) === 'success';
+    // MultiversX WebSocket sends transfers when they first appear (often pending from mempool).
+    // The API typically sends each transfer once; we may never get a "success" update.
+    // Accept both pending and success so webhooks fire. Failed/invalid are still skipped.
+    const status = this.normalizeValue(transfer?.status);
+    return status === 'success' || status === 'pending';
   }
 
   matchesFilters(transfer, filters) {
