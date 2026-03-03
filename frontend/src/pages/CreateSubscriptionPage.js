@@ -32,7 +32,7 @@ export default function CreateSubscriptionPage() {
     name: '',
     webhook_url: '',
     network: 'mainnet',
-    filters: { sender: '', receiver: '', function: '', token: '', address: '' }
+    filters: { sender: '', receiver: '', function: '', token: '', tokenIdentifier: '', address: '' }
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -61,9 +61,10 @@ export default function CreateSubscriptionPage() {
                 receiver: sub.filters.receiver || '',
                 function: sub.filters.function || '',
                 token: sub.filters.token || '',
+                tokenIdentifier: sub.filters.tokenIdentifier || '',
                 address: sub.filters.address || ''
               }
-              : { sender: '', receiver: '', function: '', token: '', address: '' }
+              : { sender: '', receiver: '', function: '', token: '', tokenIdentifier: '', address: '' }
           });
         })
         .catch(() => setLoadError('Unable to load this subscription.'))
@@ -77,6 +78,7 @@ export default function CreateSubscriptionPage() {
     if (form.filters.receiver) f.receiver = form.filters.receiver;
     if (form.filters.function) f.function = form.filters.function;
     if (form.filters.token) f.token = form.filters.token;
+    if (form.filters.tokenIdentifier) f.tokenIdentifier = form.filters.tokenIdentifier;
     if (form.filters.address) f.address = form.filters.address;
     return f;
   };
@@ -86,7 +88,7 @@ export default function CreateSubscriptionPage() {
     setError('');
     const filters = buildFilters();
     if (Object.keys(filters).length === 0) {
-      setError('At least one filter is required (sender, receiver, function, token, or address)');
+      setError('At least one filter is required (sender, receiver, function, token, tokenIdentifier, or address)');
       return;
     }
     if (!form.name || !form.webhook_url) {
@@ -194,7 +196,16 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.token}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
                   placeholder="EGLD or WEGLD-bd4d79"
-                  helperText="Payment/input token (MultiversX API filter)."
+                  helperText="API filter: EGLD or ESDT (e.g. USDC-c76f1f)."
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Token identifier"
+                  value={form.filters.tokenIdentifier}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, tokenIdentifier: e.target.value } })}
+                  placeholder="REWARD-cf6eac"
+                  helperText="Client-side: ESDT in transfer.action.arguments.transfers (e.g. REWARD-cf6eac)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>

@@ -5,10 +5,13 @@ const { parseJson } = require('../utils/parseJson');
 const database = require('../config/database');
 const webhookService = require('./webhookService');
 
+const DEDUPE_CACHE_MAX = 2000;
+
 class WebSocketService {
   constructor() {
     this.sockets = new Map(); // network -> socket instance
     this.subscriptions = new Map(); // subscriptionId -> {socket, payload}
+    this.deliveredKeys = new Set(); // txHash|status|timestamp for deduplication
     this.apiEndpoints = {
       mainnet: process.env.MVX_API_MAINNET || 'https://api.multiversx.com',
       testnet: process.env.MVX_API_TESTNET || 'https://testnet-api.multiversx.com',
@@ -191,6 +194,12 @@ class WebSocketService {
           continue;
         }
 
+        const dedupeKey = `${txId}|${transfer?.status ?? ''}|${transfer?.timestamp ?? transfer?.timestampMs ?? ''}`;
+        if (this.deliveredKeys.has(dedupeKey)) {
+          logger.info(`Skipping duplicate transfer ${txId} (already delivered)`);
+          continue;
+        }
+
         const deliveryTasks = [];
 
         for (const subscription of subscriptions) {
@@ -208,12 +217,17 @@ class WebSocketService {
           subscriptions.forEach((s) => {
             const f = parseJson(s.filters);
             logger.info(
-              `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}`
+              `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, token=${f?.token || '(any)'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}`
             );
           });
         }
 
         if (deliveryTasks.length > 0) {
+          this.deliveredKeys.add(dedupeKey);
+          if (this.deliveredKeys.size > DEDUPE_CACHE_MAX) {
+            const arr = [...this.deliveredKeys];
+            this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
+          }
           await Promise.allSettled(deliveryTasks);
         }
       }
@@ -224,6 +238,20 @@ class WebSocketService {
 
   normalizeValue(value) {
     return typeof value === 'string' ? value.trim().toLowerCase() : value;
+  }
+
+  /**
+   * Check if transfer contains the given token (ESDT identifier).
+   * Looks in action.arguments.transfers[] and operations[].
+   */
+  transferHasToken(transfer, targetToken) {
+    const fromTransfers = (transfer?.action?.arguments?.transfers || []).some(
+      (t) => this.normalizeValue(t?.token || t?.identifier) === targetToken
+    );
+    const fromOps = (transfer?.operations || []).some(
+      (op) => this.normalizeValue(op?.identifier || op?.tokenIdentifier || op?.token) === targetToken
+    );
+    return fromTransfers || fromOps;
   }
 
   transferFunctionName(transfer) {
@@ -270,13 +298,15 @@ class WebSocketService {
 
     if (normalizedFilters.token) {
       const targetToken = this.normalizeValue(normalizedFilters.token);
-      const fromTransfers = (transfer?.action?.arguments?.transfers || []).some(
-        (t) => this.normalizeValue(t?.token || t?.identifier) === targetToken
-      );
-      const fromOps = (transfer?.operations || []).some(
-        (op) => this.normalizeValue(op?.identifier || op?.tokenIdentifier || op?.token) === targetToken
-      );
-      if (!fromTransfers && !fromOps) {
+      if (!this.transferHasToken(transfer, targetToken)) {
+        return false;
+      }
+    }
+
+    // tokenIdentifier: client-side only, filters by ESDT in action.arguments.transfers
+    if (normalizedFilters.tokenIdentifier) {
+      const targetToken = this.normalizeValue(normalizedFilters.tokenIdentifier);
+      if (!this.transferHasToken(transfer, targetToken)) {
         return false;
       }
     }
@@ -332,6 +362,7 @@ class WebSocketService {
 
     this.sockets.clear();
     this.subscriptions.clear();
+    this.deliveredKeys.clear();
   }
 }
 

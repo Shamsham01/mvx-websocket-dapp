@@ -186,6 +186,26 @@ Use MultiversX API filters only. Example for swaps where user pays EGLD:
 - **function**: `swap` (top-level call)
 - **token**: Payment/input token (MultiversX API filter)
 
+### Farm claims by reward token (Sender + Function + tokenIdentifier)
+Filter by ESDT in `transfer.action.arguments.transfers` (client-side). For SCRs (token transfer from contract to user), use sender=contract:
+
+```json
+{
+  "name": "OneDEX Farm REWARD Claims",
+  "webhook_url": "https://your-webhook.com/farm-rewards",
+  "filters": {
+    "sender": "erd1qqqqqqqqqqqqqpgq5774jcntdqkzv62tlvvhfn2y7eevpty6mvlszk3dla",
+    "function": "ESDTTransfer",
+    "tokenIdentifier": "REWARD-cf6eac"
+  },
+  "network": "mainnet"
+}
+```
+
+- **sender**: Farm contract (SCR sender)
+- **function**: `ESDTTransfer` (SCR function)
+- **tokenIdentifier**: ESDT in `action.arguments.transfers` (client-side only)
+
 ## 📡 WebSocket Data Flow & Filtering
 
 **How it works:**
@@ -200,10 +220,14 @@ Use MultiversX API filters only. Example for swaps where user pays EGLD:
 - Filters by `function` **client-side** in `matchesFilters()`
 - **Requirement:** `function` must be combined with at least one of: `address`, `sender`, `receiver`, `token`
 
+**Token identifier filter (client-side only):** For ESDT tokens in `transfer.action.arguments.transfers` (e.g. farm rewards, SCR token transfers), use `tokenIdentifier`. This filters by tokens in the transfer action, not the API-level payment token. Use `token` for API filtering (EGLD, USDC-c76f1f). Use `tokenIdentifier` for ESDT in SCRs (e.g. REWARD-cf6eac). **Requirement:** `tokenIdentifier` must be combined with at least one of: `address`, `sender`, `receiver`, `token`.
+
 **Function name extraction:** The app reads the function from multiple transfer fields:
 - `transfer.function` (top-level)
 - `transfer.action.arguments.functionName` (SCRs, DEX swaps)
 - `transfer.action.name` (fallback)
+
+**Deduplication:** Identical transfers (same txHash, status, timestamp) are deduplicated; only the first is delivered to webhooks.
 
 **Note:** Multiple subscriptions share one WebSocket connection per network. Client-side filtering ensures each subscription only receives events matching its filters.
 

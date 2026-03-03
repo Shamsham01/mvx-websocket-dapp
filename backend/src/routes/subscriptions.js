@@ -26,11 +26,14 @@ const validateFilters = (filters) => {
     return 'At least one filter must be provided';
   }
 
-  // Function filter is applied client-side only; API needs address/sender/receiver/token/relayer
+  // Function and tokenIdentifier are client-side only; API needs address/sender/receiver/token/relayer
   const apiFilterKeys = ['address', 'sender', 'receiver', 'token', 'relayer'];
   const hasApiFilter = apiFilterKeys.some((k) => hasFilterValue(filters[k]));
   if (hasFilterValue(filters.function) && !hasApiFilter) {
     return 'Function filter must be combined with at least one of: address, sender, receiver, token';
+  }
+  if (hasFilterValue(filters.tokenIdentifier) && !hasApiFilter) {
+    return 'Token identifier filter must be combined with at least one of: address, sender, receiver, token';
   }
 
   return null;

@@ -45,6 +45,7 @@ const swaggerSpec = {
           sender: 'erd1...',
           receiver: 'erd1...',
           token: 'EGLD',
+          tokenIdentifier: 'REWARD-cf6eac',
           function: 'swap'
         }
       },
