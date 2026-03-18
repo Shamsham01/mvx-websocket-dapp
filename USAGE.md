@@ -218,7 +218,7 @@ For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
 **Common mistake:** Address typo — ensure `5shh` (not `5hh`) in the contract address.
 
 ### Amount and collection filters (client-side)
-- **amountMin / amountMax**: EGLD value in wei (1 EGLD = 10^18). Supports decimals (e.g. `0.5`).
+- **amountMin / amountMax**: Human-readable EGLD (e.g. `1000` for whale moves, `0.5` for small swaps). Not wei.
 - **collectionIdentifier**: NFT collection (e.g. `MADC-d03f58`). Matches `operations[].collection` and token identifiers. Use without `function` to catch any transfer involving that collection.
 
 ## 📡 WebSocket Data Flow & Filtering

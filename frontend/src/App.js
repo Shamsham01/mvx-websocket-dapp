@@ -8,6 +8,7 @@ import HomePage from './pages/HomePage';
 import DashboardPage from './pages/DashboardPage';
 import SubscriptionsPage from './pages/SubscriptionsPage';
 import CreateSubscriptionPage from './pages/CreateSubscriptionPage';
+import PemGeneratorPage from './pages/PemGeneratorPage';
 import LoginPage from './pages/LoginPage';
 import ApiDocsPage from './pages/ApiDocsPage';
 import { AuthProvider } from './context/AuthContext';
@@ -28,6 +29,7 @@ function App() {
                 <Route path="/subscriptions" element={<SubscriptionsPage />} />
                 <Route path="/subscriptions/new" element={<CreateSubscriptionPage />} />
                 <Route path="/subscriptions/:id" element={<CreateSubscriptionPage />} />
+                <Route path="/pem-generator" element={<PemGeneratorPage />} />
                 <Route path="/api-docs" element={<ApiDocsPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>

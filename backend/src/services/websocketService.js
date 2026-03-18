@@ -278,8 +278,9 @@ class WebSocketService {
   }
 
   /**
-   * Parse amount string to BigInt (handles decimals and "0").
-   * 1 EGLD = 10^18 wei. Supports "0.5" or "500000000000000000".
+   * Parse human-readable EGLD amount to BigInt (wei).
+   * Always expects EGLD values: "1000", "0.5", "0.001".
+   * 1 EGLD = 10^18 wei.
    */
   parseAmount(value) {
     if (value === undefined || value === null || value === '') return null;
@@ -291,7 +292,7 @@ class WebSocketService {
       const padded = (decPart || '').padEnd(18, '0').slice(0, 18);
       return BigInt(intPart || '0') * E18 + BigInt(padded);
     }
-    return BigInt(s);
+    return BigInt(s) * E18;
   }
 
   /**

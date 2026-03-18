@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Divider,
   FormControl,
   Grid,
   InputLabel,
@@ -184,11 +185,18 @@ export default function CreateSubscriptionPage() {
                   Filters (at least one required)
                 </Typography>
               </Grid>
+
+              <Grid item xs={12}>
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  API filters (sent to MultiversX WebSocket)
+                </Typography>
+              </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Sender"
                   value={form.filters.sender}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, sender: e.target.value } })}
+                  placeholder="erd1..."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -196,13 +204,7 @@ export default function CreateSubscriptionPage() {
                   label="Receiver"
                   value={form.filters.receiver}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, receiver: e.target.value } })}
-                />
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <TextField
-                  label="Function"
-                  value={form.filters.function}
-                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, function: e.target.value } })}
+                  placeholder="erd1..."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -210,8 +212,33 @@ export default function CreateSubscriptionPage() {
                   label="Token"
                   value={form.filters.token}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
-                  placeholder="EGLD or WEGLD-bd4d79"
-                  helperText="API filter: EGLD or ESDT (e.g. USDC-c76f1f)."
+                  placeholder="EGLD or USDC-c76f1f"
+                  helperText="EGLD or ESDT (e.g. USDC-c76f1f)."
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Address"
+                  value={form.filters.address}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, address: e.target.value } })}
+                  placeholder="erd1..."
+                  helperText="Matches sender OR receiver OR relayer."
+                />
+              </Grid>
+
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
+                  Client-side filters (applied after WebSocket)
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Function"
+                  value={form.filters.function}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, function: e.target.value } })}
+                  placeholder="swap, buy, ESDTTransfer"
+                  helperText="Smart contract function (e.g. swap, buy)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -220,14 +247,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.tokenIdentifier}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, tokenIdentifier: e.target.value } })}
                   placeholder="REWARD-cf6eac"
-                  helperText="Client-side: ESDT in transfer.action.arguments.transfers (e.g. REWARD-cf6eac)."
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Address"
-                  value={form.filters.address}
-                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, address: e.target.value } })}
+                  helperText="ESDT in action.arguments.transfers (e.g. REWARD-cf6eac)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -236,25 +256,25 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.collectionIdentifier}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, collectionIdentifier: e.target.value } })}
                   placeholder="MADC-d03f58"
-                  helperText="Client-side: NFT collection (e.g. MADC-d03f58). Use when not filtering by function."
+                  helperText="NFT collection (e.g. MADC-d03f58)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Amount min (wei)"
+                  label="Amount min (EGLD)"
                   value={form.filters.amountMin}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMin: e.target.value } })}
-                  placeholder="0"
-                  helperText="Min EGLD value in wei or decimal (e.g. 0.5 for 0.5 EGLD)."
+                  placeholder="1000"
+                  helperText="Min EGLD (e.g. 1000 for whale moves)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Amount max (wei)"
+                  label="Amount max (EGLD)"
                   value={form.filters.amountMax}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMax: e.target.value } })}
                   placeholder=""
-                  helperText="Max EGLD value in wei or decimal."
+                  helperText="Max EGLD (e.g. 5000)."
                 />
               </Grid>
               {error && (

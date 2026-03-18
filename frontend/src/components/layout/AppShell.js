@@ -27,6 +27,7 @@ import KeyboardDoubleArrowLeftRoundedIcon from '@mui/icons-material/KeyboardDoub
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import PlaylistAddCheckRoundedIcon from '@mui/icons-material/PlaylistAddCheckRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import ApiRoundedIcon from '@mui/icons-material/ApiRounded';
 import PowerSettingsNewRoundedIcon from '@mui/icons-material/PowerSettingsNewRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
@@ -48,6 +49,7 @@ const appNavItems = [
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardRoundedIcon /> },
   { label: 'Subscriptions', path: '/subscriptions', icon: <PlaylistAddCheckRoundedIcon /> },
   { label: 'Create Subscription', path: '/subscriptions/new', icon: <AddRoundedIcon /> },
+  { label: 'PEM Generator', path: '/pem-generator', icon: <KeyRoundedIcon /> },
   { label: 'API Docs', path: '/api-docs', icon: <ApiRoundedIcon /> },
 ];
 
@@ -212,6 +214,14 @@ export default function AppShell({ children }) {
           >
             <ListItemText primary="WebSocket Subscriptions" />
           </ListItemButton>
+          <ListItemButton
+            component={Link}
+            to="/pem-generator"
+            onClick={() => setMobileOpen(false)}
+            sx={{ borderRadius: 2.5, mb: 0.5 }}
+          >
+            <ListItemText primary="PEM Generator" />
+          </ListItemButton>
           {[
             { label: 'Litepaper', href: DOCS.LITEPAPER },
             { label: 'Docs', href: DOCS.MAKEX_DOCS },
@@ -285,6 +295,15 @@ export default function AppShell({ children }) {
                 sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
               >
                 Subscriptions
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                component={Link}
+                to="/pem-generator"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                PEM Generator
               </Button>
               <Button
                 size="small"
