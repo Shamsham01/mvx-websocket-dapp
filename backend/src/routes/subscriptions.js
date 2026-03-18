@@ -26,14 +26,22 @@ const validateFilters = (filters) => {
     return 'At least one filter must be provided';
   }
 
-  // Function and tokenIdentifier are client-side only; API needs address/sender/receiver/token/relayer
+  // Function, tokenIdentifier, collectionIdentifier, amountMin, amountMax are client-side only
   const apiFilterKeys = ['address', 'sender', 'receiver', 'token', 'relayer'];
   const hasApiFilter = apiFilterKeys.some((k) => hasFilterValue(filters[k]));
+  const hasAmountFilter = hasFilterValue(filters.amountMin) || hasFilterValue(filters.amountMax);
+
   if (hasFilterValue(filters.function) && !hasApiFilter) {
     return 'Function filter must be combined with at least one of: address, sender, receiver, token';
   }
   if (hasFilterValue(filters.tokenIdentifier) && !hasApiFilter) {
     return 'Token identifier filter must be combined with at least one of: address, sender, receiver, token';
+  }
+  if (hasFilterValue(filters.collectionIdentifier) && !hasApiFilter) {
+    return 'Collection identifier filter must be combined with at least one of: address, sender, receiver, token';
+  }
+  if (hasAmountFilter && !hasApiFilter) {
+    return 'Amount filter must be combined with at least one of: address, sender, receiver, token';
   }
 
   return null;

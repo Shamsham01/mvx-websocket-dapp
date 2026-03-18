@@ -217,7 +217,7 @@ class WebSocketService {
           subscriptions.forEach((s) => {
             const f = parseJson(s.filters);
             logger.info(
-              `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, token=${f?.token || '(any)'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}`
+              `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, token=${f?.token || '(any)'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, collectionIdentifier=${f?.collectionIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}, amountMin=${f?.amountMin ?? '(any)'}, amountMax=${f?.amountMax ?? '(any)'}`
             );
           });
         }
@@ -245,13 +245,62 @@ class WebSocketService {
    * Looks in action.arguments.transfers[] and operations[].
    */
   transferHasToken(transfer, targetToken) {
+    const target = this.normalizeValue(targetToken);
     const fromTransfers = (transfer?.action?.arguments?.transfers || []).some(
-      (t) => this.normalizeValue(t?.token || t?.identifier) === targetToken
+      (t) => this.normalizeValue(t?.token || t?.identifier) === target
     );
     const fromOps = (transfer?.operations || []).some(
-      (op) => this.normalizeValue(op?.identifier || op?.tokenIdentifier || op?.token) === targetToken
+      (op) => this.normalizeValue(op?.identifier || op?.tokenIdentifier || op?.token) === target
     );
     return fromTransfers || fromOps;
+  }
+
+  /**
+   * Check if transfer involves NFTs from the given collection.
+   * Collection identifier can be ASCII (e.g. MADC-d03f58) or base64.
+   * Looks in operations[].collection and identifiers that start with collection-.
+   */
+  transferHasCollection(transfer, targetCollection) {
+    const target = this.normalizeValue(targetCollection);
+    const ops = transfer?.operations || [];
+    for (const op of ops) {
+      const col = this.normalizeValue(op?.collection);
+      if (col && col === target) return true;
+      const id = this.normalizeValue(op?.identifier || op?.tokenIdentifier);
+      if (id && (id === target || id.startsWith(target + '-'))) return true;
+    }
+    const transfers = transfer?.action?.arguments?.transfers || [];
+    for (const t of transfers) {
+      const tok = this.normalizeValue(t?.token || t?.identifier);
+      if (tok && (tok === target || tok.startsWith(target + '-'))) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Parse amount string to BigInt (handles decimals and "0").
+   * 1 EGLD = 10^18 wei. Supports "0.5" or "500000000000000000".
+   */
+  parseAmount(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const s = String(value).trim();
+    if (!s) return null;
+    const E18 = BigInt('1000000000000000000');
+    if (s.includes('.')) {
+      const [intPart, decPart] = s.split('.');
+      const padded = (decPart || '').padEnd(18, '0').slice(0, 18);
+      return BigInt(intPart || '0') * E18 + BigInt(padded);
+    }
+    return BigInt(s);
+  }
+
+  /**
+   * Get the main EGLD value of the transfer (wei).
+   */
+  transferValue(transfer) {
+    const v = transfer?.value ?? transfer?.amount;
+    if (v === undefined || v === null) return BigInt(0);
+    return BigInt(String(v));
   }
 
   transferFunctionName(transfer) {
@@ -326,6 +375,25 @@ class WebSocketService {
 
     if (normalizedFilters.relayer && relayer !== this.normalizeValue(normalizedFilters.relayer)) {
       return false;
+    }
+
+    // collectionIdentifier: client-side only, filters by NFT collection in operations
+    if (normalizedFilters.collectionIdentifier) {
+      const target = this.normalizeValue(normalizedFilters.collectionIdentifier);
+      if (!this.transferHasCollection(transfer, target)) {
+        return false;
+      }
+    }
+
+    // amountMin / amountMax: filter by EGLD value (wei)
+    const txValue = this.transferValue(transfer);
+    if (normalizedFilters.amountMin != null) {
+      const minVal = this.parseAmount(normalizedFilters.amountMin);
+      if (minVal != null && txValue < minVal) return false;
+    }
+    if (normalizedFilters.amountMax != null) {
+      const maxVal = this.parseAmount(normalizedFilters.amountMax);
+      if (maxVal != null && txValue > maxVal) return false;
     }
 
     return true;

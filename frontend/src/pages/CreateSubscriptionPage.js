@@ -32,7 +32,17 @@ export default function CreateSubscriptionPage() {
     name: '',
     webhook_url: '',
     network: 'mainnet',
-    filters: { sender: '', receiver: '', function: '', token: '', tokenIdentifier: '', address: '' }
+    filters: {
+      sender: '',
+      receiver: '',
+      function: '',
+      token: '',
+      tokenIdentifier: '',
+      address: '',
+      collectionIdentifier: '',
+      amountMin: '',
+      amountMax: ''
+    }
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -51,20 +61,22 @@ export default function CreateSubscriptionPage() {
         .getOne(id)
         .then((data) => {
           const sub = data.subscription;
+          const f = typeof sub.filters === 'object' ? sub.filters : {};
           setForm({
             name: sub.name,
             webhook_url: sub.webhook_url,
             network: sub.network,
-            filters: typeof sub.filters === 'object'
-              ? {
-                sender: sub.filters.sender || '',
-                receiver: sub.filters.receiver || '',
-                function: sub.filters.function || '',
-                token: sub.filters.token || '',
-                tokenIdentifier: sub.filters.tokenIdentifier || '',
-                address: sub.filters.address || ''
-              }
-              : { sender: '', receiver: '', function: '', token: '', tokenIdentifier: '', address: '' }
+            filters: {
+              sender: f.sender || '',
+              receiver: f.receiver || '',
+              function: f.function || '',
+              token: f.token || '',
+              tokenIdentifier: f.tokenIdentifier || '',
+              address: f.address || '',
+              collectionIdentifier: f.collectionIdentifier || '',
+              amountMin: f.amountMin ?? '',
+              amountMax: f.amountMax ?? ''
+            }
           });
         })
         .catch(() => setLoadError('Unable to load this subscription.'))
@@ -80,6 +92,9 @@ export default function CreateSubscriptionPage() {
     if (form.filters.token) f.token = form.filters.token;
     if (form.filters.tokenIdentifier) f.tokenIdentifier = form.filters.tokenIdentifier;
     if (form.filters.address) f.address = form.filters.address;
+    if (form.filters.collectionIdentifier) f.collectionIdentifier = form.filters.collectionIdentifier;
+    if (form.filters.amountMin !== '') f.amountMin = form.filters.amountMin;
+    if (form.filters.amountMax !== '') f.amountMax = form.filters.amountMax;
     return f;
   };
 
@@ -213,6 +228,33 @@ export default function CreateSubscriptionPage() {
                   label="Address"
                   value={form.filters.address}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, address: e.target.value } })}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Collection identifier"
+                  value={form.filters.collectionIdentifier}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, collectionIdentifier: e.target.value } })}
+                  placeholder="MADC-d03f58"
+                  helperText="Client-side: NFT collection (e.g. MADC-d03f58). Use when not filtering by function."
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Amount min (wei)"
+                  value={form.filters.amountMin}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMin: e.target.value } })}
+                  placeholder="0"
+                  helperText="Min EGLD value in wei or decimal (e.g. 0.5 for 0.5 EGLD)."
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Amount max (wei)"
+                  value={form.filters.amountMax}
+                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMax: e.target.value } })}
+                  placeholder=""
+                  helperText="Max EGLD value in wei or decimal."
                 />
               </Grid>
               {error && (

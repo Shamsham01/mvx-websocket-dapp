@@ -206,6 +206,21 @@ Filter by ESDT in `transfer.action.arguments.transfers` (client-side). For SCRs 
 - **function**: `ESDTTransfer` (SCR function)
 - **tokenIdentifier**: ESDT in `action.arguments.transfers` (client-side only)
 
+### Madcock / XOXNO Launchpad NFT mints (Sender + Function or Collection)
+For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
+
+**Correct contract address** (verify on explorer): `erd1qqqqqqqqqqqqqpgqq38jt24jc6gtr8dvq44hcmrx4y707nsrys5shhstm0`
+
+- **Option A – main transaction**: `receiver` = contract, `function` = `buy`
+- **Option B – SCR (NFT transfer)**: `sender` = contract, `function` = `MultiESDTNFTTransfer`
+- **Option C – no function filter**: `sender` = contract, `collectionIdentifier` = `MADC-d03f58`
+
+**Common mistake:** Address typo — ensure `5shh` (not `5hh`) in the contract address.
+
+### Amount and collection filters (client-side)
+- **amountMin / amountMax**: EGLD value in wei (1 EGLD = 10^18). Supports decimals (e.g. `0.5`).
+- **collectionIdentifier**: NFT collection (e.g. `MADC-d03f58`). Matches `operations[].collection` and token identifiers. Use without `function` to catch any transfer involving that collection.
+
 ## 📡 WebSocket Data Flow & Filtering
 
 **How it works:**
