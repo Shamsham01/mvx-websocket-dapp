@@ -22,6 +22,9 @@ class WebhookService {
       try {
         logger.info(`Delivering webhook for subscription ${subscription.id}, attempt ${attempt}`);
 
+        const status = (transferData?.status || '').toLowerCase();
+        const isConfirmed = status === 'success';
+
         const response = await axios.post(
           subscription.webhook_url,
           {
@@ -31,6 +34,7 @@ class WebhookService {
               user_address: subscription.user_address
             },
             transfer: transferData,
+            confirmed: isConfirmed,
             timestamp: new Date().toISOString()
           },
           {

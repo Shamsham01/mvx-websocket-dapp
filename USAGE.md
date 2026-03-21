@@ -84,6 +84,12 @@ MVX_API_DEVNET=https://devnet-api.multiversx.com
 # Webhook Settings
 WEBHOOK_TIMEOUT_MS=10000
 WEBHOOK_MAX_RETRIES=3
+
+# Transaction Confirmation Polling (optional fallback when WebSocket misses success events)
+ENABLE_TX_CONFIRMATION_POLL=false
+CONFIRMATION_POLL_DELAY_MS=5000
+CONFIRMATION_POLL_RETRIES=6
+CONFIRMATION_POLL_INTERVAL_MS=5000
 ```
 
 ### Frontend Environment
@@ -242,9 +248,22 @@ For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
 - `transfer.action.arguments.functionName` (SCRs, DEX swaps)
 - `transfer.action.name` (fallback)
 
-**Deduplication:** Identical transfers (same txHash, status, timestamp) are deduplicated; only the first is delivered to webhooks.
+**Deduplication:** Transfers with the same `txHash` and `status` are deduplicated; only the first is delivered. Multiple subscriptions with identical API filters share a single WebSocket subscription to avoid duplicate events.
 
 **Note:** Multiple subscriptions share one WebSocket connection per network. Client-side filtering ensures each subscription only receives events matching its filters.
+
+### ⚠️ Pending vs Success: Critical for Asset-Sensitive Automations
+
+**`pending` status is NOT confirmed.** The MultiversX WebSocket often sends transfers when they first appear in the mempool. A follow-up `success` event is **not guaranteed**. Transfers may remain as `pending` only, or `success` may arrive later.
+
+**Webhook payload includes `confirmed` field:**
+- `confirmed: true` → Transfer is on-chain and final (`status: "success"`). Safe to act on.
+- `confirmed: false` → Transfer is unconfirmed (`status: "pending"`). Do **not** execute asset-moving logic (payments, credits, withdrawals) based on this alone.
+
+**Recommendations for automations:**
+1. Check `confirmed` (or `transfer.status === "success"`) before any irreversible action.
+2. For critical flows, set `ENABLE_TX_CONFIRMATION_POLL=true` in `backend/.env`. The service will poll the transaction after a pending webhook and deliver a follow-up when confirmed (success/fail).
+3. Never credit users, release goods, or execute withdrawals solely on `pending`.
 
 ## 🔐 Authentication Flow
 
