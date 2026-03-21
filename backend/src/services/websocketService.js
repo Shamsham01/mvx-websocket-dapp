@@ -4,14 +4,24 @@ const logger = require('../utils/logger');
 const { parseJson } = require('../utils/parseJson');
 const database = require('../config/database');
 const webhookService = require('./webhookService');
+const confirmationPollingService = require('./confirmationPollingService');
 
 const DEDUPE_CACHE_MAX = 2000;
+
+/**
+ * Serialize API payload to a stable key for deduplication of API subscriptions.
+ * Multiple subscriptions with the same payload share one WebSocket subscription.
+ */
+function payloadKey(payload) {
+  return JSON.stringify(payload);
+}
 
 class WebSocketService {
   constructor() {
     this.sockets = new Map(); // network -> socket instance
-    this.subscriptions = new Map(); // subscriptionId -> {socket, payload}
-    this.deliveredKeys = new Set(); // txHash|status|timestamp for deduplication
+    this.subscriptions = new Map(); // subscriptionId -> {socket, payload, network}
+    this.payloadToSubscriptionIds = new Map(); // payloadKey -> Set<subscriptionId>
+    this.deliveredKeys = new Set(); // txHash|status for deduplication (timestamp removed for stronger dedupe)
     this.apiEndpoints = {
       mainnet: process.env.MVX_API_MAINNET || 'https://api.multiversx.com',
       testnet: process.env.MVX_API_TESTNET || 'https://testnet-api.multiversx.com',
@@ -123,10 +133,19 @@ class WebSocketService {
         throw new Error('Address filter cannot be combined with sender, receiver, or relayer filters');
       }
 
-      logger.info(`Creating subscription ${subscriptionId} with filters:`, payload);
+      const key = payloadKey(payload);
+      const existing = this.payloadToSubscriptionIds.get(key);
+      const isFirstForPayload = !existing || existing.size === 0;
 
-      socket.emit('subscribeCustomTransfers', payload);
-      
+      if (isFirstForPayload) {
+        this.payloadToSubscriptionIds.set(key, new Set([subscriptionId]));
+        socket.emit('subscribeCustomTransfers', payload);
+        logger.info(`Creating subscription ${subscriptionId} (first for payload), emitting subscribeCustomTransfers`);
+      } else {
+        existing.add(subscriptionId);
+        logger.info(`Creating subscription ${subscriptionId} (merged with existing payload, ${existing.size} total)`);
+      }
+
       this.subscriptions.set(subscriptionId, {
         socket,
         payload,
@@ -149,10 +168,20 @@ class WebSocketService {
       }
 
       const { socket, payload } = subscription;
-      socket.emit('unsubscribeCustomTransfers', payload);
-      
+      const key = payloadKey(payload);
+      const ids = this.payloadToSubscriptionIds.get(key);
+      if (ids) {
+        ids.delete(subscriptionId);
+        if (ids.size === 0) {
+          this.payloadToSubscriptionIds.delete(key);
+          socket.emit('unsubscribeCustomTransfers', payload);
+          logger.info(`Removed subscription ${subscriptionId} (last for payload), emitting unsubscribeCustomTransfers`);
+        } else {
+          logger.info(`Removed subscription ${subscriptionId} (${ids.size} subscription(s) still using payload)`);
+        }
+      }
+
       this.subscriptions.delete(subscriptionId);
-      logger.info(`Removed subscription ${subscriptionId}`);
 
       return { success: true };
     } catch (error) {
@@ -194,20 +223,28 @@ class WebSocketService {
           continue;
         }
 
-        const dedupeKey = `${txId}|${transfer?.status ?? ''}|${transfer?.timestamp ?? transfer?.timestampMs ?? ''}`;
+        const dedupeKey = `${txId}|${transfer?.status ?? ''}`;
         if (this.deliveredKeys.has(dedupeKey)) {
-          logger.info(`Skipping duplicate transfer ${txId} (already delivered)`);
+          logger.info(`Skipping duplicate transfer ${txId} status=${transfer?.status} (already delivered)`);
           continue;
         }
 
         const deliveryTasks = [];
+        const matchedSubs = [];
 
         for (const subscription of subscriptions) {
           const filters = parseJson(subscription.filters);
-          if (this.matchesFilters(transfer, filters)) {
-            logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
-            deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
+          if (!this.matchesFilters(transfer, filters)) continue;
+
+          matchedSubs.push(subscription);
+          const status = (transfer?.status || '').toLowerCase();
+          if (filters.onlyConfirmed && status === 'pending') {
+            logger.info(`Transfer ${txId} matched subscription ${subscription.id} (onlyConfirmed: skipping pending)`);
+            continue;
           }
+
+          logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
+          deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
         }
 
         if (deliveryTasks.length === 0 && subscriptions.length > 0) {
@@ -229,6 +266,11 @@ class WebSocketService {
             this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
           }
           await Promise.allSettled(deliveryTasks);
+        }
+
+        const status = (transfer?.status || '').toLowerCase();
+        if (status === 'pending' && matchedSubs.length > 0) {
+          confirmationPollingService.scheduleConfirmationCheck(transfer, matchedSubs, network, this);
         }
       }
     } catch (error) {
@@ -400,18 +442,31 @@ class WebSocketService {
     return true;
   }
 
+  hasDelivered(dedupeKey) {
+    return this.deliveredKeys.has(dedupeKey);
+  }
+
+  recordDelivered(dedupeKey) {
+    this.deliveredKeys.add(dedupeKey);
+    if (this.deliveredKeys.size > DEDUPE_CACHE_MAX) {
+      const arr = [...this.deliveredKeys];
+      this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
+    }
+  }
+
   resubscribeNetwork(network, socket) {
     try {
-      let count = 0;
+      const payloadsForNetwork = new Set();
       for (const [, subscription] of this.subscriptions) {
-        if (subscription.network !== network) {
-          continue;
-        }
-        socket.emit('subscribeCustomTransfers', subscription.payload);
-        count++;
+        if (subscription.network !== network) continue;
+        payloadsForNetwork.add(payloadKey(subscription.payload));
       }
-      if (count > 0) {
-        logger.info(`Re-subscribed ${count} active in-memory subscription(s) for ${network}`);
+      for (const key of payloadsForNetwork) {
+        const payload = JSON.parse(key);
+        socket.emit('subscribeCustomTransfers', payload);
+      }
+      if (payloadsForNetwork.size > 0) {
+        logger.info(`Re-subscribed ${payloadsForNetwork.size} unique API payload(s) for ${network}`);
       }
     } catch (error) {
       logger.error(`Failed to re-subscribe subscriptions for ${network}:`, error.message);
@@ -420,7 +475,8 @@ class WebSocketService {
 
   async cleanup() {
     // Unsubscribe all and close connections
-    for (const [subscriptionId] of this.subscriptions) {
+    const ids = [...this.subscriptions.keys()];
+    for (const subscriptionId of ids) {
       await this.removeSubscription(subscriptionId);
     }
 
@@ -431,6 +487,7 @@ class WebSocketService {
 
     this.sockets.clear();
     this.subscriptions.clear();
+    this.payloadToSubscriptionIds.clear();
     this.deliveredKeys.clear();
   }
 }
