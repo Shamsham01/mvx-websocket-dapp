@@ -230,13 +230,21 @@ class WebSocketService {
         }
 
         const deliveryTasks = [];
+        const matchedSubs = [];
 
         for (const subscription of subscriptions) {
           const filters = parseJson(subscription.filters);
-          if (this.matchesFilters(transfer, filters)) {
-            logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
-            deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
+          if (!this.matchesFilters(transfer, filters)) continue;
+
+          matchedSubs.push(subscription);
+          const status = (transfer?.status || '').toLowerCase();
+          if (filters.onlyConfirmed && status === 'pending') {
+            logger.info(`Transfer ${txId} matched subscription ${subscription.id} (onlyConfirmed: skipping pending)`);
+            continue;
           }
+
+          logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
+          deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
         }
 
         if (deliveryTasks.length === 0 && subscriptions.length > 0) {
@@ -258,20 +266,11 @@ class WebSocketService {
             this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
           }
           await Promise.allSettled(deliveryTasks);
+        }
 
-          const status = (transfer?.status || '').toLowerCase();
-          if (status === 'pending') {
-            const matchedSubs = subscriptions.filter((s) => {
-              const filters = parseJson(s.filters);
-              return this.matchesFilters(transfer, filters);
-            });
-            confirmationPollingService.scheduleConfirmationCheck(
-              transfer,
-              matchedSubs,
-              network,
-              this
-            );
-          }
+        const status = (transfer?.status || '').toLowerCase();
+        if (status === 'pending' && matchedSubs.length > 0) {
+          confirmationPollingService.scheduleConfirmationCheck(transfer, matchedSubs, network, this);
         }
       }
     } catch (error) {
@@ -441,6 +440,10 @@ class WebSocketService {
     }
 
     return true;
+  }
+
+  hasDelivered(dedupeKey) {
+    return this.deliveredKeys.has(dedupeKey);
   }
 
   recordDelivered(dedupeKey) {

@@ -16,12 +16,16 @@ const hasFilterValue = (value) => {
   return true;
 };
 
+const DELIVERY_OPTION_KEYS = ['onlyConfirmed'];
+
 const validateFilters = (filters) => {
   if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
     return 'Filters must be a valid object';
   }
 
-  const filterKeys = Object.keys(filters).filter((key) => hasFilterValue(filters[key]));
+  const filterKeys = Object.keys(filters).filter(
+    (key) => !DELIVERY_OPTION_KEYS.includes(key) && hasFilterValue(filters[key])
+  );
   if (filterKeys.length === 0) {
     return 'At least one filter must be provided';
   }

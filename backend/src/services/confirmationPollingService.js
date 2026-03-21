@@ -2,7 +2,11 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 const webhookService = require('./webhookService');
 
-const ENABLED = process.env.ENABLE_TX_CONFIRMATION_POLL === 'true' || process.env.ENABLE_TX_CONFIRMATION_POLL === '1';
+// Polling is ON by default. The MultiversX WebSocket rarely sends "success"—we poll the API to deliver confirmed events.
+// Set to 'true' or '1' to disable (e.g. high-volume deployments with API rate limits).
+const DISABLED = process.env.DISABLE_TX_CONFIRMATION_POLL === 'true' || process.env.DISABLE_TX_CONFIRMATION_POLL === '1';
+const ENABLED = !DISABLED;
+
 const POLL_DELAY_MS = parseInt(process.env.CONFIRMATION_POLL_DELAY_MS, 10) || 5000;
 const POLL_RETRIES = parseInt(process.env.CONFIRMATION_POLL_RETRIES, 10) || 6;
 const POLL_INTERVAL_MS = parseInt(process.env.CONFIRMATION_POLL_INTERVAL_MS, 10) || 5000;
@@ -15,8 +19,7 @@ const apiEndpoints = {
 
 /**
  * Schedules a confirmation poll for a pending transfer.
- * When the transaction is confirmed (success/fail), delivers a follow-up webhook to the same subscriptions.
- * @param {object} wsService - WebSocketService instance (for recordDelivered), passed to avoid circular deps
+ * The MultiversX WebSocket rarely sends "success"—we poll the REST API to get the final status and deliver it.
  */
 function scheduleConfirmationCheck(transfer, subscriptions, network = 'mainnet', wsService = null) {
   if (!ENABLED || subscriptions.length === 0 || !wsService) return;
@@ -56,7 +59,14 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
 
       const txStatus = (response.data.status || '').toLowerCase();
       if (txStatus === 'success' || txStatus === 'fail' || txStatus === 'invalid') {
+        const dedupeKey = `${txHash}|${txStatus}`;
+        if (wsService.hasDelivered(dedupeKey)) {
+          logger.info(`Confirmation poll: tx ${txHash} status=${txStatus} already delivered (WebSocket sent it first), skipping`);
+          return;
+        }
+
         logger.info(`Confirmation poll: tx ${txHash} final status=${txStatus} (attempt ${attempt})`);
+        wsService.recordDelivered(dedupeKey);
 
         const confirmedTransfer = {
           ...originalTransfer,
@@ -64,9 +74,6 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
           ...(response.data.gasUsed != null && { gasUsed: String(response.data.gasUsed) }),
           ...(response.data.timestamp != null && { timestamp: response.data.timestamp })
         };
-
-        const dedupeKey = `${txHash}|${txStatus}`;
-        wsService.recordDelivered(dedupeKey);
 
         for (const sub of subscriptions) {
           await webhookService.deliverWebhook(sub, confirmedTransfer);

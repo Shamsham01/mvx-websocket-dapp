@@ -7,10 +7,12 @@ import {
   CircularProgress,
   Divider,
   FormControl,
+  FormControlLabel,
   Grid,
   InputLabel,
   MenuItem,
   Select,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material';
@@ -42,7 +44,8 @@ export default function CreateSubscriptionPage() {
       address: '',
       collectionIdentifier: '',
       amountMin: '',
-      amountMax: ''
+      amountMax: '',
+      onlyConfirmed: false
     }
   });
   const [saving, setSaving] = useState(false);
@@ -76,7 +79,8 @@ export default function CreateSubscriptionPage() {
               address: f.address || '',
               collectionIdentifier: f.collectionIdentifier || '',
               amountMin: f.amountMin ?? '',
-              amountMax: f.amountMax ?? ''
+              amountMax: f.amountMax ?? '',
+              onlyConfirmed: !!f.onlyConfirmed
             }
           });
         })
@@ -96,6 +100,7 @@ export default function CreateSubscriptionPage() {
     if (form.filters.collectionIdentifier) f.collectionIdentifier = form.filters.collectionIdentifier;
     if (form.filters.amountMin !== '') f.amountMin = form.filters.amountMin;
     if (form.filters.amountMax !== '') f.amountMax = form.filters.amountMax;
+    if (form.filters.onlyConfirmed) f.onlyConfirmed = true;
     return f;
   };
 
@@ -277,6 +282,31 @@ export default function CreateSubscriptionPage() {
                   helperText="Max EGLD (e.g. 5000)."
                 />
               </Grid>
+
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
+                  Delivery options
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!form.filters.onlyConfirmed}
+                      onChange={(e) =>
+                        setForm({ ...form, filters: { ...form.filters, onlyConfirmed: e.target.checked } })
+                      }
+                    />
+                  }
+                  label="Only confirmed (1 webhook per tx)"
+                />
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                  ON: Skip pending, only deliver when on-chain (success/fail). Best for payments and asset flows.
+                  OFF: Deliver pending + confirmed. May get 2 webhooks per tx.
+                </Typography>
+              </Grid>
+
               {error && (
                 <Grid item xs={12}>
                   <Alert severity="error">{error}</Alert>

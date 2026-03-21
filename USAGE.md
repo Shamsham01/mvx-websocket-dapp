@@ -84,12 +84,6 @@ MVX_API_DEVNET=https://devnet-api.multiversx.com
 # Webhook Settings
 WEBHOOK_TIMEOUT_MS=10000
 WEBHOOK_MAX_RETRIES=3
-
-# Transaction Confirmation Polling (optional fallback when WebSocket misses success events)
-ENABLE_TX_CONFIRMATION_POLL=false
-CONFIRMATION_POLL_DELAY_MS=5000
-CONFIRMATION_POLL_RETRIES=6
-CONFIRMATION_POLL_INTERVAL_MS=5000
 ```
 
 ### Frontend Environment
@@ -227,43 +221,45 @@ For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
 - **amountMin / amountMax**: Human-readable EGLD (e.g. `1000` for whale moves, `0.5` for small swaps). Not wei.
 - **collectionIdentifier**: NFT collection (e.g. `MADC-d03f58`). Matches `operations[].collection` and token identifiers. Use without `function` to catch any transfer involving that collection.
 
-## 📡 WebSocket Data Flow & Filtering
+## 📡 WebSocket Data Flow — Simple Model
 
-**How it works:**
-1. **MultiversX WebSocket** sends `customTransferUpdate` events (raw blockchain transfers).
-2. **App filters** each transfer:
-   - **Status**: `success` and `pending` are processed; `fail` and `invalid` are skipped. The API often sends transfers when they first appear (mempool), so `pending` is accepted.
-   - **Per-subscription**: Each transfer is checked against each subscription's filters (function, receiver, sender, token, address).
-3. **Webhook delivery**: Only transfers that match a subscription's filters are sent to that subscription's webhook URL.
+### What happens to each transaction
 
-**Function filter (client-side only):** The MultiversX API's `function` filter does not work reliably when combined with address/sender/receiver (e.g. returns no events for `{ address, function: "swap" }`). The app therefore:
-- Sends only `address`, `sender`, `receiver`, `token`, `relayer` to the API
-- Filters by `function` **client-side** in `matchesFilters()`
-- **Requirement:** `function` must be combined with at least one of: `address`, `sender`, `receiver`, `token`
+```
+1. WebSocket sends "pending" (tx in mempool)
+       ↓
+2. We optionally deliver pending to your webhook (depends on subscription setting)
+       ↓
+3. We poll the API until tx is confirmed (~5–30 seconds)
+       ↓
+4. We deliver "success" (or "fail") to your webhook
+```
 
-**Token identifier filter (client-side only):** For ESDT tokens in `transfer.action.arguments.transfers` (e.g. farm rewards, SCR token transfers), use `tokenIdentifier`. This filters by tokens in the transfer action, not the API-level payment token. Use `token` for API filtering (EGLD, USDC-c76f1f). Use `tokenIdentifier` for ESDT in SCRs (e.g. REWARD-cf6eac). **Requirement:** `tokenIdentifier` must be combined with at least one of: `address`, `sender`, `receiver`, `token`.
+**Important:** The MultiversX WebSocket rarely sends `success`. We poll the REST API to get the final status and deliver it. No extra config needed—polling is on by default.
 
-**Function name extraction:** The app reads the function from multiple transfer fields:
-- `transfer.function` (top-level)
-- `transfer.action.arguments.functionName` (SCRs, DEX swaps)
-- `transfer.action.name` (fallback)
+### Delivery modes (subscription setting)
 
-**Deduplication:** Transfers with the same `txHash` and `status` are deduplicated; only the first is delivered. Multiple subscriptions with identical API filters share a single WebSocket subscription to avoid duplicate events.
+| Setting | What you get | Use case |
+|--------|--------------|----------|
+| **Default** (Only confirmed: off) | Up to 2 webhooks per tx: pending first, then success/fail | Real-time UI, notifications |
+| **Only confirmed** (on) | 1 webhook per tx: success or fail only | Payments, credits, asset-sensitive flows |
 
-**Note:** Multiple subscriptions share one WebSocket connection per network. Client-side filtering ensures each subscription only receives events matching its filters.
+- **Default:** Pending is delivered immediately. When confirmed, success/fail is also delivered. You may get 2 events for the same tx—check `transfer.status` or `confirmed` to avoid acting twice.
+- **Only confirmed:** Pending is skipped. You get one webhook when the tx is on-chain. Recommended for anything that moves assets.
 
-### ⚠️ Pending vs Success: Critical for Asset-Sensitive Automations
+**Race handling:** Sometimes the WebSocket sends pending, then success. In parallel we poll the API. Whichever delivers first "wins"—we deduplicate so you never get two success webhooks for the same tx.
 
-**`pending` status is NOT confirmed.** The MultiversX WebSocket often sends transfers when they first appear in the mempool. A follow-up `success` event is **not guaranteed**. Transfers may remain as `pending` only, or `success` may arrive later.
+**Webhook payload:** Includes `transfer.status` and `confirmed: true/false`. Only act on `confirmed: true` for irreversible operations.
 
-**Webhook payload includes `confirmed` field:**
-- `confirmed: true` → Transfer is on-chain and final (`status: "success"`). Safe to act on.
-- `confirmed: false` → Transfer is unconfirmed (`status: "pending"`). Do **not** execute asset-moving logic (payments, credits, withdrawals) based on this alone.
+### Filtering (function, receiver, token, etc.)
 
-**Recommendations for automations:**
-1. Check `confirmed` (or `transfer.status === "success"`) before any irreversible action.
-2. For critical flows, set `ENABLE_TX_CONFIRMATION_POLL=true` in `backend/.env`. The service will poll the transaction after a pending webhook and deliver a follow-up when confirmed (success/fail).
-3. Never credit users, release goods, or execute withdrawals solely on `pending`.
+1. **MultiversX WebSocket** sends events. We filter by subscription rules (address, sender, receiver, token, function, etc.).
+2. **Client-side filters:** `function`, `tokenIdentifier`, `collectionIdentifier`, `amountMin`/`amountMax` are applied after receipt (API filters are limited).
+3. **Deduplication:** Same tx + same status = one delivery. Subscriptions with identical API filters share one WebSocket subscription.
+
+**Function filter:** Must be combined with at least one of: address, sender, receiver, token. The API's function filter is unreliable.
+
+**Token identifier:** For ESDT in SCRs (e.g. farm rewards), use `tokenIdentifier`; for API-level tokens use `token`.
 
 ## 🔐 Authentication Flow
 
@@ -369,7 +365,7 @@ If `Y active subscription(s)` is 0, subscriptions were not loaded (check DB, is_
 
 **4. MultiversX WebSocket behavior**
 
-Only MultiversX API filters are used: **sender**, **receiver**, **relayer**, **function**, **token**, **address**. Webhooks are delivered only for transfers with **status=success**.
+We receive pending and success. The WebSocket rarely sends success—we poll the API to deliver confirmed events. See the [WebSocket Data Flow](#-websocket-data-flow--simple-model) section.
 
 **5. Test with manual webhook**
 
@@ -395,6 +391,16 @@ curl -X POST https://your-api.com/api/webhooks/test/YOUR_SUBSCRIPTION_ID \
 1. Check file permissions for `data/` directory
 2. Verify SQLite is working
 3. Check disk space
+
+### Advanced: Disable confirmation polling
+
+By default we poll the API to deliver confirmed events (the WebSocket rarely sends success). If you hit API rate limits on high volume, set:
+
+```
+DISABLE_TX_CONFIRMATION_POLL=true
+```
+
+Optional tuning: `CONFIRMATION_POLL_DELAY_MS`, `CONFIRMATION_POLL_RETRIES`, `CONFIRMATION_POLL_INTERVAL_MS`.
 
 ## 📈 Scaling Considerations
 
