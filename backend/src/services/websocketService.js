@@ -61,8 +61,13 @@ class WebSocketService {
         path: '/ws/subscription',
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
-        reconnectionDelay: 1000
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 2000,
+        reconnectionDelayMax: 30000,
+        randomizationFactor: 0.5,
+        timeout: 30000,
+        pingTimeout: 60000,
+        pingInterval: 25000
       });
 
       // Set up event handlers
@@ -76,11 +81,13 @@ class WebSocketService {
       });
 
       socket.on('connect_error', (error) => {
-        logger.error(`WebSocket connection error for ${network}:`, error.message);
+        const errMsg = error?.message ?? (typeof error === 'string' ? error : JSON.stringify(error));
+        logger.error(`WebSocket connection error for ${network}: ${errMsg}`);
       });
 
       socket.on('error', (errorData) => {
-        logger.error(`WebSocket server error for ${network}:`, errorData);
+        const errMsg = errorData?.message ?? (typeof errorData === 'string' ? errorData : JSON.stringify(errorData));
+        logger.error(`WebSocket server error for ${network}: ${errMsg}`);
       });
 
       // Handle custom transfer updates
