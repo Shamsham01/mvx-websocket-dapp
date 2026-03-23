@@ -232,7 +232,14 @@ class WebSocketService {
 
         const dedupeKey = `${txId}|${transfer?.status ?? ''}`;
         if (this.deliveredKeys.has(dedupeKey)) {
-          logger.info(`Skipping duplicate transfer ${txId} status=${transfer?.status} (already delivered)`);
+          logger.info(`Skipping duplicate transfer ${txId} status=${transfer?.status} (already delivered, in-memory)`);
+          continue;
+        }
+
+        const claimed = await database.tryClaimDelivered(dedupeKey);
+        if (!claimed) {
+          logger.info(`Skipping duplicate transfer ${txId} status=${transfer?.status} (already delivered by another instance)`);
+          this.deliveredKeys.add(dedupeKey);
           continue;
         }
 

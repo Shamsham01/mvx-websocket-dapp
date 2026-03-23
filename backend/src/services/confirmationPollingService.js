@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const database = require('../config/database');
 const webhookService = require('./webhookService');
 
 // Polling is ON by default. The MultiversX WebSocket rarely sends "success"—we poll the API to deliver confirmed events.
@@ -59,9 +60,11 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
 
       const txStatus = (response.data.status || '').toLowerCase();
       if (txStatus === 'success' || txStatus === 'fail' || txStatus === 'invalid') {
-        const dedupeKey = `${txHash}|${txStatus}`;
-        if (wsService.hasDelivered(dedupeKey)) {
-          logger.info(`Confirmation poll: tx ${txHash} status=${txStatus} already delivered (WebSocket sent it first), skipping`);
+        const deliveredTxHash = originalTransfer?.txHash || originalTransfer?.hash || txHash;
+        const dedupeKey = `${deliveredTxHash}|${txStatus}`;
+        const claimed = await database.tryClaimDelivered(dedupeKey);
+        if (!claimed) {
+          logger.info(`Confirmation poll: tx ${txHash} status=${txStatus} already delivered (DB dedupe), skipping`);
           return;
         }
 

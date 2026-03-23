@@ -54,6 +54,18 @@ class Database {
         )
       `);
 
+      // Deduplication across instances/restarts - prevents duplicate webhook deliveries
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS delivered_transfers (
+          dedupe_key TEXT PRIMARY KEY,
+          delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_delivered_transfers_delivered_at 
+        ON delivered_transfers(delivered_at)
+      `);
+
       // Create webhook_logs table for tracking deliveries
       await client.query(`
         CREATE TABLE IF NOT EXISTS webhook_logs (
@@ -104,6 +116,23 @@ class Database {
     const pgSql = convertPlaceholders(sql);
     const result = await this.pool.query(pgSql, params);
     return result.rows[0] || null;
+  }
+
+  /**
+   * Atomic "claim" for deduplication. Only the first caller (across all instances) gets true.
+   * Used to prevent duplicate webhook deliveries when multiple backend instances or
+   * concurrent WebSocket + poll both try to deliver the same transfer.
+   * @returns {Promise<boolean>} true if we claimed (should deliver), false if already delivered by someone
+   */
+  async tryClaimDelivered(dedupeKey) {
+    const pgSql = `
+      INSERT INTO delivered_transfers (dedupe_key) 
+      VALUES ($1) 
+      ON CONFLICT (dedupe_key) DO NOTHING 
+      RETURNING dedupe_key
+    `;
+    const result = await this.pool.query(pgSql, [dedupeKey]);
+    return result.rowCount > 0;
   }
 
   async close() {
