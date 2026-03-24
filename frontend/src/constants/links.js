@@ -9,8 +9,9 @@ export const MEDIA = {
 export const APP_LOGOS = {
   TRANSFERS: 'https://i.ibb.co/TBf79Q0B/Multivers-X-Transfers.png',
   SNAPSHOT_DRAW: 'https://i.ibb.co/8nFjZp3g/ESDT-1.png',
-  ASSETS_MANAGER: 'https://i.ibb.co/TMFBkwKj/Assets-Manager.png',
+  ASSETS_MANAGER: 'https://i.ibb.co/prykbvwP/Assets-Manager.png',
   WARPS: 'https://i.ibb.co/NgfrGqmr/Warps.png',
+  MULTIVERSX_SWAP: 'https://i.ibb.co/bjVKxw0T/Multivers-X-Swap.png',
 };
 
 /** Replace '#' with actual Make.com installation URLs when available. */
@@ -19,6 +20,8 @@ export const INSTALL_URLS = {
   SNAPSHOT_DRAW: 'https://www.make.com/en/hq/app-invitation/682839e9c23f1ba1aeb9925e16551466',
   ASSETS_MANAGER: 'https://www.make.com/en/hq/app-invitation/4663d084cfa02a4cfc8824724f4bfa6a',
   WARPS: 'https://www.make.com/en/hq/app-invitation/113f288efa442e5a2529b09e3dbe4339',
+  MULTIVERSX_SWAP:
+    'https://www.make.com/en/hq/app-invitation/3a507f832c08750761281c87e3b2055a',
   XEXCHANGE_SWAP: '#',
 };
 

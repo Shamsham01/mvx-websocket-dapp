@@ -21,6 +21,8 @@ import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { APP_LOGOS, INSTALL_URLS } from '../../constants/links';
 
+const APP_LOGO_AVATAR_SX = { width: 52, height: 52 };
+
 const apps = [
   {
     name: 'MultiversX Transfers',
@@ -45,6 +47,12 @@ const apps = [
     logo: APP_LOGOS.WARPS,
     purpose: 'Query and execute smart contract endpoints visually',
     installUrl: INSTALL_URLS.WARPS,
+  },
+  {
+    name: 'MultiversX Swap',
+    logo: APP_LOGOS.MULTIVERSX_SWAP,
+    purpose: 'Automated token swaps using AshSwap Aggregator',
+    installUrl: INSTALL_URLS.MULTIVERSX_SWAP,
   },
   {
     name: 'xExchange Swap',
@@ -93,12 +101,12 @@ export default function InstallAppsSection() {
                             src={app.logo}
                             alt={app.name}
                             variant="rounded"
-                            sx={{ width: 36, height: 36 }}
+                            sx={APP_LOGO_AVATAR_SX}
                           />
                         ) : (
                           <Avatar
                             variant="rounded"
-                            sx={{ width: 36, height: 36, bgcolor: 'primary.dark' }}
+                            sx={{ ...APP_LOGO_AVATAR_SX, bgcolor: 'primary.dark' }}
                           >
                             <SwapHorizRoundedIcon fontSize="small" />
                           </Avatar>
@@ -147,12 +155,12 @@ export default function InstallAppsSection() {
                         src={app.logo}
                         alt={app.name}
                         variant="rounded"
-                        sx={{ width: 36, height: 36 }}
+                        sx={APP_LOGO_AVATAR_SX}
                       />
                     ) : (
                       <Avatar
                         variant="rounded"
-                        sx={{ width: 36, height: 36, bgcolor: 'primary.dark' }}
+                        sx={{ ...APP_LOGO_AVATAR_SX, bgcolor: 'primary.dark' }}
                       >
                         <SwapHorizRoundedIcon fontSize="small" />
                       </Avatar>

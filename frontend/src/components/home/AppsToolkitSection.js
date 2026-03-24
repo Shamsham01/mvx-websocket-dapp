@@ -69,6 +69,19 @@ const apps = [
     installUrl: INSTALL_URLS.WARPS,
   },
   {
+    name: 'MultiversX Swap',
+    logo: APP_LOGOS.MULTIVERSX_SWAP,
+    purpose: 'Automated token swaps using AshSwap Aggregator',
+    users: 'Traders, treasury managers, DeFi teams',
+    capabilities: [
+      'Automated swap triggers',
+      'AshSwap Aggregator routing',
+      'Portfolio & treasury flows',
+      'DeFi strategy automation',
+    ],
+    installUrl: INSTALL_URLS.MULTIVERSX_SWAP,
+  },
+  {
     name: 'xExchange Swap',
     logo: null,
     purpose: 'Trigger token swaps on xExchange with automation rules.',
@@ -96,7 +109,7 @@ export default function AppsToolkitSection() {
           color="text.secondary"
           sx={{ mb: 5, textAlign: 'center', maxWidth: 600, mx: 'auto' }}
         >
-          Five purpose-built Make.com modules that cover the full spectrum of
+          Six purpose-built Make.com modules that cover the full spectrum of
           on-chain operations.
         </Typography>
 
@@ -120,12 +133,12 @@ export default function AppsToolkitSection() {
                         src={app.logo}
                         alt={app.name}
                         variant="rounded"
-                        sx={{ width: 44, height: 44 }}
+                        sx={{ width: 52, height: 52 }}
                       />
                     ) : (
                       <Avatar
                         variant="rounded"
-                        sx={{ width: 44, height: 44, bgcolor: 'primary.dark' }}
+                        sx={{ width: 52, height: 52, bgcolor: 'primary.dark' }}
                       >
                         <SwapHorizRoundedIcon />
                       </Avatar>
