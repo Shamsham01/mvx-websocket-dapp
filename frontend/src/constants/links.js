@@ -4,6 +4,8 @@ export const MEDIA = {
   MAKE_LOGO:
     'https://www.freelogovectors.net/wp-content/uploads/2023/11/make-logo-freelogovectors.net_.png',
   MAKEX_LOGO: 'https://i.ibb.co/rsPX3fy/Make-X-Logo-Trnasparent-BG.png',
+  AI_AGENTS_ILLUSTRATION:
+    'https://i.ibb.co/XrcYxX2P/Agents-vs-agentic2-TNF.webp',
 };
 
 export const APP_LOGOS = {

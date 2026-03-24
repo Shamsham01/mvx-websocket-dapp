@@ -2,8 +2,6 @@ import React from 'react';
 import {
   Box,
   Button,
-  Card,
-  CardContent,
   Container,
   Grid,
   List,
@@ -13,10 +11,9 @@ import {
   Typography,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
-import SmartToyRoundedIcon from '@mui/icons-material/SmartToyRounded';
 import ArrowRightRoundedIcon from '@mui/icons-material/ArrowRightRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
-import { DOCS } from '../../constants/links';
+import { DOCS, MEDIA } from '../../constants/links';
 
 const agentUseCases = [
   'Portfolio monitoring with automated swap execution',
@@ -64,32 +61,32 @@ export default function AiAgentsSection() {
           </Grid>
 
           <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <Box
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: '50%',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    mb: 2,
-                    background: (t) =>
-                      `linear-gradient(135deg, ${alpha(t.palette.primary.main, 0.15)}, ${alpha(t.palette.secondary.main, 0.15)})`,
-                  }}
-                >
-                  <SmartToyRoundedIcon sx={{ fontSize: 40, color: 'primary.main' }} />
-                </Box>
-                <Typography variant="h5" sx={{ mb: 1 }}>
-                  Agentic Workflows
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  AI agents with wallets that monitor, decide, and act on-chain
-                  — powered by Make.com scenarios and MakeX modules.
-                </Typography>
-              </CardContent>
-            </Card>
+            <Box
+              sx={{
+                borderRadius: 2,
+                overflow: 'hidden',
+                border: (t) => `1px solid ${alpha(t.palette.divider, 0.4)}`,
+                bgcolor: (t) => alpha(t.palette.background.paper, 0.6),
+                boxShadow: (t) =>
+                  t.palette.mode === 'dark'
+                    ? `0 8px 32px ${alpha('#000', 0.35)}`
+                    : `0 8px 24px ${alpha('#000', 0.08)}`,
+              }}
+            >
+              <Box
+                component="img"
+                src={MEDIA.AI_AGENTS_ILLUSTRATION}
+                alt="Traditional agents compared to agentic workflows with MakeX on-chain automation"
+                sx={{
+                  display: 'block',
+                  maxWidth: '100%',
+                  maxHeight: { xs: 300, sm: 360, md: 440 },
+                  width: 'auto',
+                  height: 'auto',
+                  mx: 'auto',
+                }}
+              />
+            </Box>
           </Grid>
         </Grid>
       </Container>
