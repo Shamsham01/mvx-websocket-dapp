@@ -11,7 +11,6 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { APP_LOGOS, INSTALL_URLS } from '../../constants/links';
 
@@ -81,20 +80,6 @@ const apps = [
     ],
     installUrl: INSTALL_URLS.MULTIVERSX_SWAP,
   },
-  {
-    name: 'xExchange Swap',
-    logo: null,
-    purpose: 'Trigger token swaps on xExchange with automation rules.',
-    users: 'Traders, treasury managers, DeFi teams',
-    capabilities: [
-      'Automated swap triggers',
-      'Price-threshold execution',
-      'Portfolio rebalancing',
-      'DeFi strategy automation',
-    ],
-    installUrl: INSTALL_URLS.XEXCHANGE_SWAP,
-    comingSoon: true,
-  },
 ];
 
 export default function AppsToolkitSection() {
@@ -109,7 +94,7 @@ export default function AppsToolkitSection() {
           color="text.secondary"
           sx={{ mb: 5, textAlign: 'center', maxWidth: 600, mx: 'auto' }}
         >
-          Six purpose-built Make.com modules that cover the full spectrum of
+          Five purpose-built Make.com modules that cover the full spectrum of
           on-chain operations.
         </Typography>
 
@@ -128,21 +113,12 @@ export default function AppsToolkitSection() {
                   sx={{ p: 3, flex: 1, display: 'flex', flexDirection: 'column' }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-                    {app.logo ? (
-                      <Avatar
-                        src={app.logo}
-                        alt={app.name}
-                        variant="rounded"
-                        sx={{ width: 52, height: 52 }}
-                      />
-                    ) : (
-                      <Avatar
-                        variant="rounded"
-                        sx={{ width: 52, height: 52, bgcolor: 'primary.dark' }}
-                      >
-                        <SwapHorizRoundedIcon />
-                      </Avatar>
-                    )}
+                    <Avatar
+                      src={app.logo}
+                      alt={app.name}
+                      variant="rounded"
+                      sx={{ width: 52, height: 52 }}
+                    />
                     <Box>
                       <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
                         {app.name}
@@ -176,23 +152,17 @@ export default function AppsToolkitSection() {
                   </Stack>
 
                   <Box sx={{ mt: 'auto' }}>
-                    {app.comingSoon ? (
-                      <Button variant="outlined" size="small" disabled fullWidth>
-                        Coming Soon
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        endIcon={<OpenInNewRoundedIcon />}
-                        href={app.installUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        fullWidth
-                      >
-                        Install on Make.com
-                      </Button>
-                    )}
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      endIcon={<OpenInNewRoundedIcon />}
+                      href={app.installUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      fullWidth
+                    >
+                      Install on Make.com
+                    </Button>
                   </Box>
                 </CardContent>
               </Card>

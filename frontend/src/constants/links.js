@@ -22,7 +22,6 @@ export const INSTALL_URLS = {
   WARPS: 'https://www.make.com/en/hq/app-invitation/113f288efa442e5a2529b09e3dbe4339',
   MULTIVERSX_SWAP:
     'https://www.make.com/en/hq/app-invitation/3a507f832c08750761281c87e3b2055a',
-  XEXCHANGE_SWAP: '#',
 };
 
 export const COMMUNITY = {

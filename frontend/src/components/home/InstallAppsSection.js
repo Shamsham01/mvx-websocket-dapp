@@ -17,7 +17,6 @@ import {
   useMediaQuery,
 } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import SwapHorizRoundedIcon from '@mui/icons-material/SwapHorizRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { APP_LOGOS, INSTALL_URLS } from '../../constants/links';
 
@@ -54,13 +53,6 @@ const apps = [
     purpose: 'Automated token swaps using AshSwap Aggregator',
     installUrl: INSTALL_URLS.MULTIVERSX_SWAP,
   },
-  {
-    name: 'xExchange Swap',
-    logo: null,
-    purpose: 'Automated token swaps on xExchange',
-    installUrl: INSTALL_URLS.XEXCHANGE_SWAP,
-    comingSoon: true,
-  },
 ];
 
 export default function InstallAppsSection() {
@@ -96,21 +88,12 @@ export default function InstallAppsSection() {
                   <TableRow key={app.name}>
                     <TableCell>
                       <Stack direction="row" spacing={1.5} alignItems="center">
-                        {app.logo ? (
-                          <Avatar
-                            src={app.logo}
-                            alt={app.name}
-                            variant="rounded"
-                            sx={APP_LOGO_AVATAR_SX}
-                          />
-                        ) : (
-                          <Avatar
-                            variant="rounded"
-                            sx={{ ...APP_LOGO_AVATAR_SX, bgcolor: 'primary.dark' }}
-                          >
-                            <SwapHorizRoundedIcon fontSize="small" />
-                          </Avatar>
-                        )}
+                        <Avatar
+                          src={app.logo}
+                          alt={app.name}
+                          variant="rounded"
+                          sx={APP_LOGO_AVATAR_SX}
+                        />
                         <Typography variant="body2" sx={{ fontWeight: 600 }}>
                           {app.name}
                         </Typography>
@@ -122,22 +105,16 @@ export default function InstallAppsSection() {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      {app.comingSoon ? (
-                        <Button variant="outlined" size="small" disabled>
-                          Coming Soon
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          endIcon={<OpenInNewRoundedIcon />}
-                          href={app.installUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Install
-                        </Button>
-                      )}
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        endIcon={<OpenInNewRoundedIcon />}
+                        href={app.installUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Install
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -150,21 +127,12 @@ export default function InstallAppsSection() {
               <Card key={app.name}>
                 <CardContent sx={{ p: 2.5 }}>
                   <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
-                    {app.logo ? (
-                      <Avatar
-                        src={app.logo}
-                        alt={app.name}
-                        variant="rounded"
-                        sx={APP_LOGO_AVATAR_SX}
-                      />
-                    ) : (
-                      <Avatar
-                        variant="rounded"
-                        sx={{ ...APP_LOGO_AVATAR_SX, bgcolor: 'primary.dark' }}
-                      >
-                        <SwapHorizRoundedIcon fontSize="small" />
-                      </Avatar>
-                    )}
+                    <Avatar
+                      src={app.logo}
+                      alt={app.name}
+                      variant="rounded"
+                      sx={APP_LOGO_AVATAR_SX}
+                    />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {app.name}
                     </Typography>
@@ -172,23 +140,17 @@ export default function InstallAppsSection() {
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                     {app.purpose}
                   </Typography>
-                  {app.comingSoon ? (
-                    <Button variant="outlined" size="small" disabled fullWidth>
-                      Coming Soon
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      endIcon={<OpenInNewRoundedIcon />}
-                      href={app.installUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      fullWidth
-                    >
-                      Install
-                    </Button>
-                  )}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    endIcon={<OpenInNewRoundedIcon />}
+                    href={app.installUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    fullWidth
+                  >
+                    Install
+                  </Button>
                 </CardContent>
               </Card>
             ))}

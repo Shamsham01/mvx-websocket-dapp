@@ -28,10 +28,10 @@ We offer a comprehensive suite of custom apps designed to handle every aspect of
 *   **Issue Tokens:** Deploy new ESDT tokens directly from the visual builder.
 *   **Role Management:** Assign minting/burning roles to specific wallets automatically.
 
-### 🔄 xExchange Swap
-**DeFi Automation.** Connect directly to the liquidity of the MultiversX DEX.
-*   **Auto-Swaps:** Trigger token swaps based on external market data.
-*   **Treasury Management:** Automate portfolio rebalancing rules.
+### 🔄 MultiversX Swap
+**DeFi automation via AshSwap Aggregator.** Route swaps across MultiversX liquidity from Make.com.
+*   **Auto-Swaps:** Trigger token swaps based on external market data or workflow logic.
+*   **Treasury flows:** Automate portfolio moves and rebalancing rules.
 
 ### ⚡ Warps
 **The Smart Contract Bridge.** The most powerful tool in the box.
@@ -75,7 +75,7 @@ You can configure your subscription to filter noise and only trigger your scenar
 
 By combining the new **Make AI Agents** with **MakeX**, you can build autonomous, wallet-equipped assistants that think, decide, and act on-chain—no coding required.
 
-*   **Manage Portfolios:** Build agents that monitor market sentiment and asset prices in real-time to execute swaps on xExchange, optimizing your holdings 24/7 without human intervention.
+*   **Manage Portfolios:** Build agents that monitor market sentiment and asset prices in real-time to execute token swaps and treasury moves, optimizing your holdings 24/7 without human intervention.
 *   **Balance Treasuries:** Create a "Treasury Manager" agent instructed to "maintain 50% in stablecoins and stake the rest." The agent will autonomously calculate ratios and execute the necessary rebalancing transactions.
 *   **Manage Communities:** Deploy "Swarm Agents" that analyze Discord engagement or X (Twitter) sentiment, automatically identifying key contributors and rewarding them with NFT airdrops or token tips.
 *   **Perform On-Chain Tasks:** From sweeping NFT floors based on trait rarity to executing complex smart contract "Warps," your agents can handle sophisticated blockchain operations using natural language logic.
@@ -92,7 +92,7 @@ Ready to build? Click below to install the custom modules directly into your Mak
 | **MultiversX Transfers** | Send EGLD, ESDT, & NFTs | [**Install Module ⬇️**](#https://eu2.make.com/app/invite/db68efb5e85d04d711a632a3b2017b7d) |
 | **Snapshot & Draw** | Holder Snapshots & Raffles | [**Install Module ⬇️**](#https://eu2.make.com/app/invite/682839e9c23f1ba1aeb9925e16551466) |
 | **Assets Manager** | Issue, Mint, & Burn Tokens | [**Install Module ⬇️**](#https://www.make.com/en/hq/app-invitation/4663d084cfa02a4cfc8824724f4bfa6a) |
-| **xExchange Swap** | DEX Swaps & Liquidity | [**Install Module ⬇️**](#Coming Soon) |
+| **MultiversX Swap** | AshSwap Aggregator swaps | [**Install Module ⬇️**](#https://www.make.com/en/hq/app-invitation/3a507f832c08750761281c87e3b2055a) |
 | **Warps** | Smart Contract Interactions | [**Install Module ⬇️**](#https://eu2.make.com/app/invite/113f288efa442e5a2529b09e3dbe4339) |
 
 ---
