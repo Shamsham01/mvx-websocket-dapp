@@ -12,6 +12,7 @@ const webhookService = require('./services/webhookService');
 const authRoutes = require('./routes/auth');
 const subscriptionRoutes = require('./routes/subscriptions');
 const webhookRoutes = require('./routes/webhooks');
+const templateRoutes = require('./routes/templates');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -29,6 +30,7 @@ app.use(morgan('combined', { stream: logger.stream }));
 app.use('/api/auth', authRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/webhooks', webhookRoutes);
+app.use('/api/templates', templateRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

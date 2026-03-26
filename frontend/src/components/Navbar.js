@@ -120,6 +120,14 @@ export default function Navbar() {
               <Button
                 color="inherit"
                 component={Link}
+                to="/templates"
+                sx={{ borderRadius: 20, px: 2, textTransform: 'none', fontWeight: 600 }}
+              >
+                Templates
+              </Button>
+              <Button
+                color="inherit"
+                component={Link}
                 to="/subscriptions"
                 sx={{ borderRadius: 20, px: 2, textTransform: 'none', fontWeight: 600 }}
               >

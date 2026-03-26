@@ -11,6 +11,7 @@ import CreateSubscriptionPage from './pages/CreateSubscriptionPage';
 import PemGeneratorPage from './pages/PemGeneratorPage';
 import LoginPage from './pages/LoginPage';
 import ApiDocsPage from './pages/ApiDocsPage';
+import TemplatesPage from './pages/TemplatesPage';
 import { AuthProvider } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 
@@ -26,6 +27,7 @@ function App() {
                 <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
+                <Route path="/templates" element={<TemplatesPage />} />
                 <Route path="/subscriptions" element={<SubscriptionsPage />} />
                 <Route path="/subscriptions/new" element={<CreateSubscriptionPage />} />
                 <Route path="/subscriptions/:id" element={<CreateSubscriptionPage />} />

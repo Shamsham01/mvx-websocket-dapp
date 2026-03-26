@@ -16,6 +16,14 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (config.data instanceof FormData) {
+      const h = config.headers;
+      if (h && typeof h.delete === 'function') {
+        h.delete('Content-Type');
+      } else if (h) {
+        delete h['Content-Type'];
+      }
+    }
     return config;
   },
   (error) => {
@@ -89,6 +97,13 @@ export const webhookAPI = {
   
   getDeliveries: (limit = 50, offset = 0) => 
     api.get(`/webhooks/deliveries?limit=${limit}&offset=${offset}`),
+};
+
+/** Make.com blueprint templates (multipart: use FormData). Admin-only on server. */
+export const templateAPI = {
+  create: (formData) => api.post('/templates', formData),
+  update: (id, formData) => api.put(`/templates/${encodeURIComponent(id)}`, formData),
+  delete: (id) => api.delete(`/templates/${encodeURIComponent(id)}`),
 };
 
 export default api;

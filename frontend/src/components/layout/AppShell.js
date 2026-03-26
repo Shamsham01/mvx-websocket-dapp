@@ -29,6 +29,7 @@ import PlaylistAddCheckRoundedIcon from '@mui/icons-material/PlaylistAddCheckRou
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import ApiRoundedIcon from '@mui/icons-material/ApiRounded';
+import ViewModuleRoundedIcon from '@mui/icons-material/ViewModuleRounded';
 import PowerSettingsNewRoundedIcon from '@mui/icons-material/PowerSettingsNewRounded';
 import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import ArrowDropDownRoundedIcon from '@mui/icons-material/ArrowDropDownRounded';
@@ -47,6 +48,7 @@ const collapsedDrawerWidth = 84;
 const appNavItems = [
   { label: 'Home', path: '/', icon: <HomeRoundedIcon /> },
   { label: 'Dashboard', path: '/dashboard', icon: <DashboardRoundedIcon /> },
+  { label: 'Templates', path: '/templates', icon: <ViewModuleRoundedIcon /> },
   { label: 'Subscriptions', path: '/subscriptions', icon: <PlaylistAddCheckRoundedIcon /> },
   { label: 'Create Subscription', path: '/subscriptions/new', icon: <AddRoundedIcon /> },
   { label: 'PEM Generator', path: '/pem-generator', icon: <KeyRoundedIcon /> },
@@ -208,6 +210,22 @@ export default function AppShell({ children }) {
           ))}
           <ListItemButton
             component={Link}
+            to="/dashboard"
+            onClick={() => setMobileOpen(false)}
+            sx={{ borderRadius: 2.5, mb: 0.5 }}
+          >
+            <ListItemText primary="Dashboard" />
+          </ListItemButton>
+          <ListItemButton
+            component={Link}
+            to="/templates"
+            onClick={() => setMobileOpen(false)}
+            sx={{ borderRadius: 2.5, mb: 0.5 }}
+          >
+            <ListItemText primary="Templates" />
+          </ListItemButton>
+          <ListItemButton
+            component={Link}
             to="/subscriptions"
             onClick={() => setMobileOpen(false)}
             sx={{ borderRadius: 2.5, mb: 0.5 }}
@@ -286,6 +304,24 @@ export default function AppShell({ children }) {
                 sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
               >
                 Install
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                component={Link}
+                to="/dashboard"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Dashboard
+              </Button>
+              <Button
+                size="small"
+                color="inherit"
+                component={Link}
+                to="/templates"
+                sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+              >
+                Templates
               </Button>
               <Button
                 size="small"
