@@ -30,6 +30,7 @@ import SectionCard from '../components/ui/SectionCard';
 import EmptyState from '../components/ui/EmptyState';
 import ErrorState from '../components/ui/ErrorState';
 import CopyableField from '../components/ui/CopyableField';
+import SubscriptionAnalyticsSection from '../components/dashboard/SubscriptionAnalyticsSection';
 import { useNotify } from '../context/NotificationContext';
 
 export default function SubscriptionsPage() {
@@ -162,6 +163,8 @@ export default function SubscriptionsPage() {
           </TableContainer>
         </SectionCard>
       )}
+
+      <SubscriptionAnalyticsSection user={user} />
     </Box>
   );
 }
