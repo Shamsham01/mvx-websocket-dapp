@@ -15,6 +15,7 @@ const {
   getAdminWallet,
 } = require('../services/supabaseTemplates');
 const { parseTemplateLabel } = require('../constants/templateLabels');
+const { normalizeYoutubeUrl } = require('../utils/youtubeUrl');
 
 const router = express.Router();
 
@@ -86,6 +87,15 @@ router.post('/', authenticate, requireAdmin, twoFiles, async (req, res) => {
       return res.status(400).json({ error: labelParsed.error });
     }
 
+    let youtubeUrl = null;
+    if (req.body.youtube_url !== undefined && req.body.youtube_url !== null) {
+      const yt = normalizeYoutubeUrl(req.body.youtube_url);
+      if (yt.error) {
+        return res.status(400).json({ error: yt.error });
+      }
+      youtubeUrl = yt.value;
+    }
+
     const previewFile = req.files?.preview?.[0];
     const blueprintFile = req.files?.blueprint?.[0];
     if (!previewFile || !validateImage(previewFile.mimetype)) {
@@ -113,6 +123,7 @@ router.post('/', authenticate, requireAdmin, twoFiles, async (req, res) => {
       title,
       description,
       label: labelParsed.label,
+      youtube_url: youtubeUrl,
       preview_image_url: publicObjectUrl(baseUrl, previewPath),
       blueprint_file_url: publicObjectUrl(baseUrl, blueprintPath),
       blueprint_filename: blueprintFilename,
@@ -148,6 +159,15 @@ router.put('/:id', authenticate, requireAdmin, optionalFiles, async (req, res) =
         return res.status(400).json({ error: labelParsed.error });
       }
       labelUpdate = labelParsed.label;
+    }
+
+    let youtubeUpdate;
+    if (req.body.youtube_url !== undefined && req.body.youtube_url !== null) {
+      const yt = normalizeYoutubeUrl(req.body.youtube_url);
+      if (yt.error) {
+        return res.status(400).json({ error: yt.error });
+      }
+      youtubeUpdate = yt.value;
     }
 
     const previewFile = req.files?.preview?.[0];
@@ -195,6 +215,7 @@ router.put('/:id', authenticate, requireAdmin, optionalFiles, async (req, res) =
       ...(title !== undefined ? { title } : {}),
       ...(description !== undefined ? { description } : {}),
       ...(labelUpdate !== undefined ? { label: labelUpdate } : {}),
+      ...(youtubeUpdate !== undefined ? { youtube_url: youtubeUpdate } : {}),
       preview_image_url: previewUrl,
       blueprint_file_url: blueprintUrl,
       blueprint_filename: blueprintFilename,

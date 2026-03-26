@@ -12,6 +12,7 @@ create table if not exists public.makex_make_templates (
   storage_preview_path text not null,
   storage_blueprint_path text not null,
   label text not null default 'Snapshots',
+  youtube_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

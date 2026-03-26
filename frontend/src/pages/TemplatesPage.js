@@ -33,6 +33,9 @@ import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import DownloadRoundedIcon from '@mui/icons-material/DownloadRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import UnfoldMoreRoundedIcon from '@mui/icons-material/UnfoldMoreRounded';
+import VideoLibraryRoundedIcon from '@mui/icons-material/VideoLibraryRounded';
 import { useAuth } from '../context/AuthContext';
 import { useNotify } from '../context/NotificationContext';
 import PageHeader from '../components/ui/PageHeader';
@@ -50,6 +53,11 @@ import {
   TEMPLATE_LABEL_PRESETS,
   isPresetLabel,
 } from '../constants/templateLabels';
+
+/** Show “read full” when description is likely clamped (keeps card layout even). */
+function descriptionNeedsExpand(text) {
+  return (text || '').trim().length > 140;
+}
 
 async function downloadBlueprintFile(url, filename) {
   try {
@@ -71,6 +79,7 @@ async function downloadBlueprintFile(url, filename) {
 function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, isAdmin }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
   const [labelChoice, setLabelChoice] = useState(TEMPLATE_LABEL_PRESETS[0]);
   const [customLabel, setCustomLabel] = useState('');
   const [previewFile, setPreviewFile] = useState(null);
@@ -86,6 +95,7 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
     if (mode === 'edit' && template) {
       setTitle(template.title || '');
       setDescription(template.description || '');
+      setYoutubeUrl(template.youtube_url || '');
       const lbl = template.label || TEMPLATE_LABEL_PRESETS[0];
       if (isPresetLabel(lbl)) {
         setLabelChoice(lbl);
@@ -97,6 +107,7 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
     } else {
       setTitle('');
       setDescription('');
+      setYoutubeUrl('');
       setLabelChoice(TEMPLATE_LABEL_PRESETS[0]);
       setCustomLabel('');
     }
@@ -127,6 +138,7 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
       fd.append('title', title.trim());
       fd.append('description', description.trim());
       fd.append('label', resolvedLabel);
+      fd.append('youtube_url', youtubeUrl.trim());
       if (previewFile) fd.append('preview', previewFile);
       if (blueprintFile) fd.append('blueprint', blueprintFile);
 
@@ -186,6 +198,13 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
               required
             />
           )}
+          <TextField
+            label="YouTube video (optional)"
+            value={youtubeUrl}
+            onChange={(e) => setYoutubeUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…"
+            helperText="Walkthrough or demo. Leave blank if not ready — you can add it when editing the template later. Clear the field to remove the button from the card."
+          />
           <Box>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
               Preview image {mode === 'edit' ? '(optional — leave blank to keep current)' : ''}
@@ -257,6 +276,7 @@ export default function TemplatesPage() {
   const [dialogMode, setDialogMode] = useState('create');
   const [editing, setEditing] = useState(null);
   const [labelFilter, setLabelFilter] = useState(TEMPLATE_FILTER_ALL);
+  const [descriptionDetail, setDescriptionDetail] = useState(null);
 
   const isAdmin = isTemplatesAdmin(user?.address);
 
@@ -446,18 +466,56 @@ export default function TemplatesPage() {
                     >
                       {t.description || '—'}
                     </Typography>
+                    {descriptionNeedsExpand(t.description) && (
+                      <Button
+                        size="small"
+                        startIcon={<UnfoldMoreRoundedIcon />}
+                        onClick={() =>
+                          setDescriptionDetail({ title: t.title, body: t.description || '' })
+                        }
+                        sx={{ mt: 1, px: 0, alignSelf: 'flex-start', textTransform: 'none' }}
+                      >
+                        Full description
+                      </Button>
+                    )}
                   </CardContent>
-                  <CardActions sx={{ px: 2, pb: 2, pt: 0, justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<DownloadRoundedIcon />}
-                      onClick={() => downloadBlueprintFile(t.blueprint_file_url, t.blueprint_filename)}
-                    >
-                      Download
-                    </Button>
+                  <CardActions
+                    sx={{
+                      px: 2,
+                      pb: 2,
+                      pt: 0,
+                      flexDirection: 'column',
+                      alignItems: 'stretch',
+                      gap: 1.25,
+                    }}
+                  >
+                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ width: '100%' }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<DownloadRoundedIcon />}
+                        onClick={() => downloadBlueprintFile(t.blueprint_file_url, t.blueprint_filename)}
+                      >
+                        Download
+                      </Button>
+                      {t.youtube_url && (
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          color="secondary"
+                          startIcon={<VideoLibraryRoundedIcon />}
+                          endIcon={<OpenInNewRoundedIcon sx={{ fontSize: 16 }} />}
+                          href={t.youtube_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          component="a"
+                        >
+                          Video
+                        </Button>
+                      )}
+                    </Stack>
                     {isAdmin && (
-                      <Stack direction="row" spacing={0.5}>
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
                         <Tooltip title="Edit">
                           <IconButton size="small" color="primary" onClick={() => openEdit(t)}>
                             <EditRoundedIcon fontSize="small" />
@@ -477,6 +535,28 @@ export default function TemplatesPage() {
           </Grid>
         )}
       </SectionCard>
+
+      <Dialog
+        open={Boolean(descriptionDetail)}
+        onClose={() => setDescriptionDetail(null)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { backgroundImage: 'none' } }}
+      >
+        <DialogTitle>{descriptionDetail?.title || 'Description'}</DialogTitle>
+        <DialogContent>
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', pt: 0.5 }}
+          >
+            {descriptionDetail?.body?.trim() ? descriptionDetail.body : '—'}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setDescriptionDetail(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <TemplateFormDialog
         open={dialogOpen}
