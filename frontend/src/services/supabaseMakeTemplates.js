@@ -12,7 +12,7 @@ export async function fetchMakeTemplates() {
   }
 
   const res = await fetch(
-    `${url.replace(/\/$/, '')}/rest/v1/${TABLE}?select=id,title,description,preview_image_url,blueprint_file_url,blueprint_filename,created_at&order=created_at.desc`,
+    `${url.replace(/\/$/, '')}/rest/v1/${TABLE}?select=id,title,description,label,preview_image_url,blueprint_file_url,blueprint_filename,created_at&order=created_at.desc`,
     {
       headers: {
         apikey: key,

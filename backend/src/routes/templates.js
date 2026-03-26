@@ -14,6 +14,7 @@ const {
   getRowById,
   getAdminWallet,
 } = require('../services/supabaseTemplates');
+const { parseTemplateLabel } = require('../constants/templateLabels');
 
 const router = express.Router();
 
@@ -80,6 +81,11 @@ router.post('/', authenticate, requireAdmin, twoFiles, async (req, res) => {
       return res.status(400).json({ error: 'Title is required' });
     }
 
+    const labelParsed = parseTemplateLabel(req.body);
+    if (labelParsed.error) {
+      return res.status(400).json({ error: labelParsed.error });
+    }
+
     const previewFile = req.files?.preview?.[0];
     const blueprintFile = req.files?.blueprint?.[0];
     if (!previewFile || !validateImage(previewFile.mimetype)) {
@@ -106,6 +112,7 @@ router.post('/', authenticate, requireAdmin, twoFiles, async (req, res) => {
       id,
       title,
       description,
+      label: labelParsed.label,
       preview_image_url: publicObjectUrl(baseUrl, previewPath),
       blueprint_file_url: publicObjectUrl(baseUrl, blueprintPath),
       blueprint_filename: blueprintFilename,
@@ -132,6 +139,15 @@ router.put('/:id', authenticate, requireAdmin, optionalFiles, async (req, res) =
     const description = req.body.description != null ? String(req.body.description).trim() : undefined;
     if (title !== undefined && !title) {
       return res.status(400).json({ error: 'Title cannot be empty' });
+    }
+
+    let labelUpdate;
+    if (req.body.label !== undefined && req.body.label !== null && String(req.body.label).trim() !== '') {
+      const labelParsed = parseTemplateLabel(req.body);
+      if (labelParsed.error) {
+        return res.status(400).json({ error: labelParsed.error });
+      }
+      labelUpdate = labelParsed.label;
     }
 
     const previewFile = req.files?.preview?.[0];
@@ -178,6 +194,7 @@ router.put('/:id', authenticate, requireAdmin, optionalFiles, async (req, res) =
     const patch = {
       ...(title !== undefined ? { title } : {}),
       ...(description !== undefined ? { description } : {}),
+      ...(labelUpdate !== undefined ? { label: labelUpdate } : {}),
       preview_image_url: previewUrl,
       blueprint_file_url: blueprintUrl,
       blueprint_filename: blueprintFilename,

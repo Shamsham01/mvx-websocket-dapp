@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -8,16 +8,23 @@ import {
   CardActions,
   CardContent,
   CardMedia,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   Grid,
   IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
   Skeleton,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -36,6 +43,13 @@ import ViewModuleRoundedIcon from '@mui/icons-material/ViewModuleRounded';
 import { fetchMakeTemplates } from '../services/supabaseMakeTemplates';
 import { templateAPI } from '../services/api';
 import { isTemplatesAdmin } from '../constants/templatesAdmin';
+import {
+  TEMPLATE_CUSTOM_LABEL_VALUE,
+  TEMPLATE_FILTER_ALL,
+  TEMPLATE_FILTER_OTHER,
+  TEMPLATE_LABEL_PRESETS,
+  isPresetLabel,
+} from '../constants/templateLabels';
 
 async function downloadBlueprintFile(url, filename) {
   try {
@@ -57,6 +71,8 @@ async function downloadBlueprintFile(url, filename) {
 function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, isAdmin }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [labelChoice, setLabelChoice] = useState(TEMPLATE_LABEL_PRESETS[0]);
+  const [customLabel, setCustomLabel] = useState('');
   const [previewFile, setPreviewFile] = useState(null);
   const [blueprintFile, setBlueprintFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -70,9 +86,19 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
     if (mode === 'edit' && template) {
       setTitle(template.title || '');
       setDescription(template.description || '');
+      const lbl = template.label || TEMPLATE_LABEL_PRESETS[0];
+      if (isPresetLabel(lbl)) {
+        setLabelChoice(lbl);
+        setCustomLabel('');
+      } else {
+        setLabelChoice(TEMPLATE_CUSTOM_LABEL_VALUE);
+        setCustomLabel(lbl);
+      }
     } else {
       setTitle('');
       setDescription('');
+      setLabelChoice(TEMPLATE_LABEL_PRESETS[0]);
+      setCustomLabel('');
     }
   }, [open, mode, template]);
 
@@ -82,10 +108,17 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
       setError('Title is required.');
       return;
     }
+    if (labelChoice === TEMPLATE_CUSTOM_LABEL_VALUE && !customLabel.trim()) {
+      setError('Enter a custom label.');
+      return;
+    }
     if (mode === 'create' && (!previewFile || !blueprintFile)) {
       setError('Preview image and blueprint JSON are required.');
       return;
     }
+
+    const resolvedLabel =
+      labelChoice === TEMPLATE_CUSTOM_LABEL_VALUE ? customLabel.trim() : labelChoice;
 
     setSubmitting(true);
     setError('');
@@ -93,6 +126,7 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
       const fd = new FormData();
       fd.append('title', title.trim());
       fd.append('description', description.trim());
+      fd.append('label', resolvedLabel);
       if (previewFile) fd.append('preview', previewFile);
       if (blueprintFile) fd.append('blueprint', blueprintFile);
 
@@ -126,6 +160,32 @@ function TemplateFormDialog({ open, onClose, mode, template, onSaved, notify, is
             multiline
             rows={4}
           />
+          <FormControl fullWidth>
+            <InputLabel id="template-label-select">Label</InputLabel>
+            <Select
+              labelId="template-label-select"
+              label="Label"
+              value={labelChoice}
+              onChange={(e) => setLabelChoice(e.target.value)}
+            >
+              {TEMPLATE_LABEL_PRESETS.map((preset) => (
+                <MenuItem key={preset} value={preset}>
+                  {preset}
+                </MenuItem>
+              ))}
+              <MenuItem value={TEMPLATE_CUSTOM_LABEL_VALUE}>Custom…</MenuItem>
+            </Select>
+          </FormControl>
+          {labelChoice === TEMPLATE_CUSTOM_LABEL_VALUE && (
+            <TextField
+              label="Custom label"
+              value={customLabel}
+              onChange={(e) => setCustomLabel(e.target.value)}
+              placeholder="e.g. NFT Alerts, Treasury Bot"
+              helperText="Shown on the card and used for marketplace browse under Custom filter."
+              required
+            />
+          )}
           <Box>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.75 }}>
               Preview image {mode === 'edit' ? '(optional — leave blank to keep current)' : ''}
@@ -196,8 +256,17 @@ export default function TemplatesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState('create');
   const [editing, setEditing] = useState(null);
+  const [labelFilter, setLabelFilter] = useState(TEMPLATE_FILTER_ALL);
 
   const isAdmin = isTemplatesAdmin(user?.address);
+
+  const filteredTemplates = useMemo(() => {
+    if (labelFilter === TEMPLATE_FILTER_ALL) return templates;
+    if (labelFilter === TEMPLATE_FILTER_OTHER) {
+      return templates.filter((t) => !isPresetLabel(t.label));
+    }
+    return templates.filter((t) => t.label === labelFilter);
+  }, [templates, labelFilter]);
 
   const loadList = useCallback(async () => {
     setLoadingList(true);
@@ -278,7 +347,31 @@ export default function TemplatesPage() {
         </Alert>
       )}
 
-      <SectionCard>
+      <SectionCard
+        title="Browse"
+        description="Filter by label to narrow the marketplace."
+        action={
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={labelFilter}
+            onChange={(_, v) => v != null && setLabelFilter(v)}
+            sx={{
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end',
+              '& .MuiToggleButton-root': { px: 1.1, py: 0.5, textTransform: 'none' },
+            }}
+          >
+            <ToggleButton value={TEMPLATE_FILTER_ALL}>All</ToggleButton>
+            {TEMPLATE_LABEL_PRESETS.map((preset) => (
+              <ToggleButton key={preset} value={preset}>
+                {preset}
+              </ToggleButton>
+            ))}
+            <ToggleButton value={TEMPLATE_FILTER_OTHER}>Custom</ToggleButton>
+          </ToggleButtonGroup>
+        }
+      >
         {loadingList ? (
           <Grid container spacing={2.5}>
             {[1, 2, 3].map((k) => (
@@ -293,9 +386,18 @@ export default function TemplatesPage() {
             description="When an admin publishes Make.com blueprints, they will appear here as cards with one-click download."
             icon={<ViewModuleRoundedIcon fontSize="large" />}
           />
+        ) : filteredTemplates.length === 0 ? (
+          <Stack spacing={2} alignItems="center" sx={{ py: 6 }}>
+            <Typography variant="body1" color="text.secondary">
+              No templates match this label. Try another filter or show all.
+            </Typography>
+            <Button variant="outlined" onClick={() => setLabelFilter(TEMPLATE_FILTER_ALL)}>
+              Show all
+            </Button>
+          </Stack>
         ) : (
           <Grid container spacing={2.5}>
-            {templates.map((t) => (
+            {filteredTemplates.map((t) => (
               <Grid item xs={12} sm={6} md={4} key={t.id}>
                 <Card
                   sx={{
@@ -318,6 +420,17 @@ export default function TemplatesPage() {
                     sx={{ objectFit: 'cover', bgcolor: alpha(theme.palette.common.black, 0.2) }}
                   />
                   <CardContent sx={{ flexGrow: 1 }}>
+                    <Chip
+                      label={t.label || '—'}
+                      size="small"
+                      sx={{
+                        mb: 1.25,
+                        fontWeight: 600,
+                        borderColor: alpha(theme.palette.secondary.main, 0.45),
+                      }}
+                      variant="outlined"
+                      color="secondary"
+                    />
                     <Typography variant="h6" gutterBottom>
                       {t.title}
                     </Typography>

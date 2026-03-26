@@ -11,12 +11,16 @@ create table if not exists public.makex_make_templates (
   blueprint_filename text not null default 'blueprint.json',
   storage_preview_path text not null,
   storage_blueprint_path text not null,
+  label text not null default 'Snapshots',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 create index if not exists idx_makex_make_templates_created_at
   on public.makex_make_templates (created_at desc);
+
+create index if not exists idx_makex_make_templates_label
+  on public.makex_make_templates (label);
 
 alter table public.makex_make_templates enable row level security;
 
