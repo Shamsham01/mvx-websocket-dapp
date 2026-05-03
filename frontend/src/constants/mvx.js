@@ -7,3 +7,6 @@ export const MAKEX_USAGE_FEE_ADDRESS =
 
 export const REWARD_TOKEN_ID = 'REWARD-cf6eac';
 export const REWARD_DECIMALS = 8;
+
+/** Free-trial whitelist length (whitelist_end = start + this many days) */
+export const MAKEX_FREE_TRIAL_DAYS = 90;

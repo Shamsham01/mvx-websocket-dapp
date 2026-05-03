@@ -15,11 +15,11 @@ import {
 import { alpha } from '@mui/material/styles';
 import CheckCircleOutlineRoundedIcon from '@mui/icons-material/CheckCircleOutlineRounded';
 import { useAuth } from '../../context/AuthContext';
+import { MAKEX_FREE_TRIAL_DAYS } from '../../constants/mvx';
 
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const TABLE = 'makex_usage_fee_whitelist';
-const TRIAL_DAYS = 30;
 
 function formatDate(date) {
   return date.toLocaleDateString('en-US', {
@@ -42,7 +42,7 @@ export default function FreeTrialDialog({ open, onClose }) {
   const startDate = useMemo(() => new Date(), []);
   const endDate = useMemo(() => {
     const d = new Date();
-    d.setDate(d.getDate() + TRIAL_DAYS);
+    d.setDate(d.getDate() + MAKEX_FREE_TRIAL_DAYS);
     return d;
   }, []);
 
@@ -88,7 +88,8 @@ export default function FreeTrialDialog({ open, onClose }) {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
-          Prefer: 'return=representation',
+          // With RLS and no anon SELECT policy, representation would require exposing rows.
+          Prefer: 'return=minimal',
         },
         body: JSON.stringify(body),
       });
@@ -137,7 +138,7 @@ export default function FreeTrialDialog({ open, onClose }) {
               Free Trial Activated!
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-              Your 30-day free trial is active until:
+              Your {MAKEX_FREE_TRIAL_DAYS}-day free trial is active until:
             </Typography>
             <Typography variant="h6" color="primary.main">
               {formatDate(endDate)}
@@ -157,7 +158,7 @@ export default function FreeTrialDialog({ open, onClose }) {
           <DialogTitle>
             Claim Your Free Trial
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              30 days fee-free access to every MakeX app. No credit card required.
+              {MAKEX_FREE_TRIAL_DAYS} days fee-free access to every MakeX app. No credit card required.
             </Typography>
           </DialogTitle>
 
@@ -217,7 +218,7 @@ export default function FreeTrialDialog({ open, onClose }) {
                   label="Trial Expires"
                   value={formatDate(endDate)}
                   disabled
-                  helperText={`${TRIAL_DAYS}-day free trial period`}
+                  helperText={`${MAKEX_FREE_TRIAL_DAYS}-day free trial period`}
                   InputProps={{
                     sx: {
                       color: (t) => alpha(t.palette.text.primary, 0.5),

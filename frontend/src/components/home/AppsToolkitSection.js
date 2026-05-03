@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Avatar,
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
@@ -11,8 +10,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
-import { APP_LOGOS, INSTALL_URLS } from '../../constants/links';
+import { APP_LOGOS } from '../../constants/links';
 
 const apps = [
   {
@@ -26,7 +24,6 @@ const apps = [
       'Bulk NFT/SFT distribution',
       'CSV-driven airdrops',
     ],
-    installUrl: INSTALL_URLS.TRANSFERS,
   },
   {
     name: 'Snapshot & Draw',
@@ -39,7 +36,6 @@ const apps = [
       'Verifiable random draws',
       'Raffle automation',
     ],
-    installUrl: INSTALL_URLS.SNAPSHOT_DRAW,
   },
   {
     name: 'Assets Manager',
@@ -52,7 +48,6 @@ const apps = [
       'Manage token roles',
       'Lifecycle operations',
     ],
-    installUrl: INSTALL_URLS.ASSETS_MANAGER,
   },
   {
     name: 'Warps',
@@ -65,7 +60,6 @@ const apps = [
       'Chain multi-step interactions',
       'No-code contract ops',
     ],
-    installUrl: INSTALL_URLS.WARPS,
   },
   {
     name: 'MultiversX Swap',
@@ -78,7 +72,6 @@ const apps = [
       'Portfolio & treasury flows',
       'DeFi strategy automation',
     ],
-    installUrl: INSTALL_URLS.MULTIVERSX_SWAP,
   },
 ];
 
@@ -138,7 +131,6 @@ export default function AppsToolkitSection() {
                     spacing={0.5}
                     flexWrap="wrap"
                     useFlexGap
-                    sx={{ mb: 2 }}
                   >
                     {app.capabilities.map((c) => (
                       <Chip
@@ -150,20 +142,6 @@ export default function AppsToolkitSection() {
                       />
                     ))}
                   </Stack>
-
-                  <Box sx={{ mt: 'auto' }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      endIcon={<OpenInNewRoundedIcon />}
-                      href={app.installUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      fullWidth
-                    >
-                      Install on Make.com
-                    </Button>
-                  </Box>
                 </CardContent>
               </Card>
             </Grid>

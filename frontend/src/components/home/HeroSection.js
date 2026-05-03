@@ -7,6 +7,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { openWalletConnect } from '../../utils/walletConnect';
 import { MEDIA } from '../../constants/links';
+import { MAKEX_FREE_TRIAL_DAYS } from '../../constants/mvx';
 
 function scrollTo(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
@@ -30,28 +31,14 @@ export default function HeroSection({ onOpenTrial }) {
           variant="h1"
           sx={{
             fontSize: { xs: '2rem', sm: '2.5rem', md: '3.25rem' },
-            mb: 2,
+            mb: 4,
             background: 'linear-gradient(135deg, #ecf2ff 0%, #46d9ff 50%, #8a7cff 100%)',
             backgroundClip: 'text',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}
         >
-          {`MakeX: The \u201CZapier\u201D of MultiversX`}
-        </Typography>
-
-        <Typography
-          variant="h5"
-          color="text.secondary"
-          sx={{
-            fontWeight: 400,
-            mb: 4,
-            maxWidth: 560,
-            mx: 'auto',
-            fontSize: { xs: '1rem', md: '1.125rem' },
-          }}
-        >
-          Your Gateway to AI, Automation, and Blockchain Innovation.
+          Your Gateway to AI, Automation, and Blockchain Innovation
         </Typography>
 
         <Stack
@@ -61,7 +48,7 @@ export default function HeroSection({ onOpenTrial }) {
           sx={{ mb: 5 }}
         >
           <Button variant="contained" size="large" onClick={handleTrialClick}>
-            Try Free for 30 Days
+            Try Free for {MAKEX_FREE_TRIAL_DAYS} Days
           </Button>
           <Button
             variant="outlined"

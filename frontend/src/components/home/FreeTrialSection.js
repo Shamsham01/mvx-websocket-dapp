@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Button, Card, CardContent, Container, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useAuth } from '../../context/AuthContext';
+import { MAKEX_FREE_TRIAL_DAYS } from '../../constants/mvx';
 import { openWalletConnect } from '../../utils/walletConnect';
 
 export default function FreeTrialSection({ onOpenTrial }) {
@@ -38,7 +39,7 @@ export default function FreeTrialSection({ onOpenTrial }) {
               Free Trial + $REWARD
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-              30 days fee-free to test every MakeX app.
+              {MAKEX_FREE_TRIAL_DAYS} days fee-free to test every MakeX app.
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
               After the trial, operations are powered by $REWARD with micro-fees
