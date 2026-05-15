@@ -8,6 +8,12 @@ const confirmationPollingService = require('./confirmationPollingService');
 
 const DEDUPE_CACHE_MAX = 2000;
 
+/** Set LOG_LEVEL=debug to include nested tx diagnostics when no subscription matches. */
+const FILTER_DEBUG =
+  process.env.LOG_LEVEL === 'debug' ||
+  process.env.WEBSOCKET_FILTER_DEBUG === 'true' ||
+  process.env.WEBSOCKET_FILTER_DEBUG === '1';
+
 /**
  * Serialize API payload to a stable key for deduplication of API subscriptions.
  * Multiple subscriptions with the same payload share one WebSocket subscription.
@@ -127,6 +133,22 @@ class WebSocketService {
 
       // Remove undefined values
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
+
+      // User→SC calls (e.g. marketplace `buy`) appear with the wallet as sender and the contract as receiver.
+      // Subscribing with API `sender` = contract drops those rows server-side. Using `address` includes both legs.
+      const loneSenderAnchor =
+        payload.sender &&
+        !payload.receiver &&
+        !payload.relayer &&
+        !payload.token &&
+        !payload.address;
+      if (loneSenderAnchor) {
+        payload.address = payload.sender;
+        delete payload.sender;
+        logger.info(
+          `Subscription ${subscriptionId}: API filter uses address=<sender> so inbound SC calls are not dropped by MVX`
+        );
+      }
 
       // API requires at least one filter; we omit function (filtered client-side)
       if (Object.keys(payload).length === 0) {
@@ -261,10 +283,18 @@ class WebSocketService {
           deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
         }
 
-        if (deliveryTasks.length === 0 && subscriptions.length > 0) {
+        if (deliveryTasks.length === 0 && matchedSubs.length === 0 && subscriptions.length > 0) {
+          const deepFns = [...this.transferFunctionNamesSet(transfer)].join(',');
           logger.info(
-            `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, function=${fn})`
+            `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, topFunction=${fn}, deepFunctions=[${deepFns}])`
           );
+          if (FILTER_DEBUG) {
+            const senders = [...this.transferSenderAddressesSet(transfer)].slice(0, 8).join(',');
+            const receivers = [...this.transferReceiverAddressesSet(transfer)].slice(0, 8).join(',');
+            logger.debug(
+              `Transfer ${txId} filter-debug senders(sample)=${senders} receivers(sample)=${receivers}`
+            );
+          }
           subscriptions.forEach((s) => {
             const f = parseJson(s.filters);
             logger.info(
@@ -374,6 +404,66 @@ class WebSocketService {
     );
   }
 
+  /**
+   * All normalized function / event names on the transfer (parent + inner SCRs + logs).
+   * Needed when MVX aggregates a purchase: outer `buy` vs inner `ESDTNFTTransfer`.
+   */
+  transferFunctionNamesSet(transfer) {
+    const names = new Set();
+    const add = (v) => {
+      const n = this.normalizeValue(v);
+      if (n) names.add(n);
+    };
+    add(this.transferFunctionName(transfer));
+    for (const r of transfer?.results || []) {
+      add(r.function);
+      add(r.action?.name);
+      add(r.action?.arguments?.functionName);
+      add(r.action?.arguments?.function);
+      for (const ev of r?.logs?.events || []) {
+        add(ev.identifier);
+      }
+    }
+    for (const ev of transfer?.logs?.events || []) {
+      add(ev.identifier);
+    }
+    return names;
+  }
+
+  /** Normalized sender addresses on parent row, inner results, and operations. */
+  transferSenderAddressesSet(transfer) {
+    const addrs = new Set();
+    const add = (v) => {
+      const n = this.normalizeValue(v);
+      if (n) addrs.add(n);
+    };
+    add(transfer?.sender);
+    for (const r of transfer?.results || []) {
+      add(r.sender);
+    }
+    for (const op of transfer?.operations || []) {
+      add(op.sender);
+    }
+    return addrs;
+  }
+
+  /** Normalized receiver addresses on parent row, inner results, and operations. */
+  transferReceiverAddressesSet(transfer) {
+    const addrs = new Set();
+    const add = (v) => {
+      const n = this.normalizeValue(v);
+      if (n) addrs.add(n);
+    };
+    add(transfer?.receiver);
+    for (const r of transfer?.results || []) {
+      add(r.receiver);
+    }
+    for (const op of transfer?.operations || []) {
+      add(op.receiver);
+    }
+    return addrs;
+  }
+
   shouldProcessTransfer(transfer) {
     // MultiversX WebSocket sends transfers when they first appear (often pending from mempool).
     // The API typically sends each transfer once; we may never get a "success" update.
@@ -387,19 +477,27 @@ class WebSocketService {
     const sender = this.normalizeValue(transfer.sender);
     const receiver = this.normalizeValue(transfer.receiver);
     const relayer = this.normalizeValue(transfer.relayer);
-    const functionName = this.normalizeValue(this.transferFunctionName(transfer));
 
     // Check each filter condition
-    if (normalizedFilters.sender && sender !== this.normalizeValue(normalizedFilters.sender)) {
-      return false;
+    if (normalizedFilters.sender) {
+      const want = this.normalizeValue(normalizedFilters.sender);
+      if (!this.transferSenderAddressesSet(transfer).has(want)) {
+        return false;
+      }
     }
 
-    if (normalizedFilters.receiver && receiver !== this.normalizeValue(normalizedFilters.receiver)) {
-      return false;
+    if (normalizedFilters.receiver) {
+      const want = this.normalizeValue(normalizedFilters.receiver);
+      if (!this.transferReceiverAddressesSet(transfer).has(want)) {
+        return false;
+      }
     }
 
-    if (normalizedFilters.function && functionName !== this.normalizeValue(normalizedFilters.function)) {
-      return false;
+    if (normalizedFilters.function) {
+      const want = this.normalizeValue(normalizedFilters.function);
+      if (!this.transferFunctionNamesSet(transfer).has(want)) {
+        return false;
+      }
     }
 
     if (normalizedFilters.token) {

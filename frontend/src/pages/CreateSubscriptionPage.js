@@ -202,6 +202,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.sender}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, sender: e.target.value } })}
                   placeholder="erd1..."
+                  helperText="For smart contracts (marketplaces, routers), prefer Address below: user txs usually list the wallet as sender."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
