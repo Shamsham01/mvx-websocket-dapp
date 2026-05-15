@@ -14,6 +14,11 @@ const FILTER_DEBUG =
   process.env.WEBSOCKET_FILTER_DEBUG === 'true' ||
   process.env.WEBSOCKET_FILTER_DEBUG === '1';
 
+/** When true, skip REST GET /transactions/:hash to enrich thin WS payloads (not recommended). */
+const ENRICH_DISABLED =
+  process.env.DISABLE_WS_TRANSFER_ENRICHMENT === 'true' ||
+  process.env.DISABLE_WS_TRANSFER_ENRICHMENT === '1';
+
 /**
  * Serialize API payload to a stable key for deduplication of API subscriptions.
  * Multiple subscriptions with the same payload share one WebSocket subscription.
@@ -219,6 +224,69 @@ class WebSocketService {
     }
   }
 
+  subscriptionsNeedNestedMatching(subscriptions) {
+    return subscriptions.some((s) => {
+      const f = parseJson(s.filters);
+      if (!f || typeof f !== 'object') return false;
+      return !!(f.function || f.collectionIdentifier || f.tokenIdentifier || f.token);
+    });
+  }
+
+  isThinTransferPayload(transfer) {
+    const ops = transfer?.operations;
+    const res = transfer?.results;
+    const hasOps = Array.isArray(ops) && ops.length > 0;
+    const hasRes = Array.isArray(res) && res.length > 0;
+    return !hasOps && !hasRes;
+  }
+
+  mergeApiTxIntoTransfer(wsTransfer, apiTx) {
+    if (!apiTx || typeof apiTx !== 'object') return wsTransfer;
+    return {
+      ...wsTransfer,
+      ...apiTx,
+      txHash: wsTransfer?.txHash || apiTx.txHash,
+      hash: wsTransfer?.hash || apiTx.txHash
+    };
+  }
+
+  async fetchTransactionDetails(network, txHash) {
+    const apiUrl = this.apiEndpoints[network];
+    if (!apiUrl || !txHash || txHash === 'unknown') return null;
+    try {
+      const response = await axios.get(`${apiUrl}/transactions/${txHash}`, { timeout: 15000 });
+      return response.data || null;
+    } catch (error) {
+      logger.warn(`REST enrich failed for ${txHash}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * @returns {{ matchedSubs: any[], subscriptionsToDeliver: any[] }}
+   */
+  evaluateTransferAgainstSubscriptions(transfer, subscriptions) {
+    const matchedSubs = [];
+    const subscriptionsToDeliver = [];
+    const txId = transfer?.txHash || transfer?.hash || 'unknown';
+
+    for (const subscription of subscriptions) {
+      const filters = parseJson(subscription.filters);
+      if (!this.matchesFilters(transfer, filters)) continue;
+
+      matchedSubs.push(subscription);
+      const status = (transfer?.status || '').toLowerCase();
+      if (filters.onlyConfirmed && status === 'pending') {
+        logger.info(`Transfer ${txId} matched subscription ${subscription.id} (onlyConfirmed: skipping pending)`);
+        continue;
+      }
+
+      logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
+      subscriptionsToDeliver.push(subscription);
+    }
+    return { matchedSubs, subscriptionsToDeliver };
+  }
+
   async handleTransferUpdate(network, data) {
     try {
       if (!data.transfers || !Array.isArray(data.transfers) || data.transfers.length === 0) {
@@ -258,52 +326,75 @@ class WebSocketService {
           continue;
         }
 
+        let processedTransfer = transfer;
+        let { matchedSubs, subscriptionsToDeliver } = this.evaluateTransferAgainstSubscriptions(
+          processedTransfer,
+          subscriptions
+        );
+
+        const statusLower = (transfer?.status || '').toLowerCase();
+        if (
+          !ENRICH_DISABLED &&
+          matchedSubs.length === 0 &&
+          txId !== 'unknown' &&
+          this.isThinTransferPayload(processedTransfer) &&
+          this.subscriptionsNeedNestedMatching(subscriptions) &&
+          (statusLower === 'pending' || statusLower === 'success')
+        ) {
+          const apiTx = await this.fetchTransactionDetails(network, txId);
+          if (apiTx) {
+            processedTransfer = this.mergeApiTxIntoTransfer(transfer, apiTx);
+            ({ matchedSubs, subscriptionsToDeliver } = this.evaluateTransferAgainstSubscriptions(
+              processedTransfer,
+              subscriptions
+            ));
+            if (matchedSubs.length > 0) {
+              logger.info(
+                `Transfer ${txId}: enriched from REST for matching (operations=${processedTransfer?.operations?.length || 0}, results=${processedTransfer?.results?.length || 0})`
+              );
+            }
+          }
+        }
+
+        const schedulePoll = statusLower === 'pending' && matchedSubs.length > 0;
+        const hasWork = subscriptionsToDeliver.length > 0 || schedulePoll;
+
+        if (!hasWork) {
+          if (matchedSubs.length === 0 && subscriptions.length > 0) {
+            const deepFns = [...this.transferFunctionNamesSet(processedTransfer)].join(',');
+            logger.info(
+              `Transfer ${txId} did not match any subscription (receiver=${processedTransfer?.receiver}, topFunction=${fn}, deepFunctions=[${deepFns}])`
+            );
+            if (FILTER_DEBUG) {
+              const senders = [...this.transferSenderAddressesSet(processedTransfer)].slice(0, 8).join(',');
+              const receivers = [...this.transferReceiverAddressesSet(processedTransfer)].slice(0, 8).join(',');
+              logger.debug(
+                `Transfer ${txId} filter-debug senders(sample)=${senders} receivers(sample)=${receivers}`
+              );
+            }
+            subscriptions.forEach((s) => {
+              const f = parseJson(s.filters);
+              logger.info(
+                `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, token=${f?.token || '(any)'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, collectionIdentifier=${f?.collectionIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}, amountMin=${f?.amountMin ?? '(any)'}, amountMax=${f?.amountMax ?? '(any)'}`
+              );
+            });
+          }
+          continue;
+        }
+
         const claimed = await database.tryClaimDelivered(dedupeKey);
         if (!claimed) {
-          logger.info(`Skipping duplicate transfer ${txId} status=${transfer?.status} (already delivered by another instance)`);
+          logger.info(
+            `Skipping duplicate transfer ${txId} status=${transfer?.status} (another instance owns dedupe for delivery/poll)`
+          );
           this.deliveredKeys.add(dedupeKey);
           continue;
         }
 
-        const deliveryTasks = [];
-        const matchedSubs = [];
-
-        for (const subscription of subscriptions) {
-          const filters = parseJson(subscription.filters);
-          if (!this.matchesFilters(transfer, filters)) continue;
-
-          matchedSubs.push(subscription);
-          const status = (transfer?.status || '').toLowerCase();
-          if (filters.onlyConfirmed && status === 'pending') {
-            logger.info(`Transfer ${txId} matched subscription ${subscription.id} (onlyConfirmed: skipping pending)`);
-            continue;
-          }
-
-          logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
-          deliveryTasks.push(webhookService.deliverWebhook(subscription, transfer));
-        }
-
-        if (deliveryTasks.length === 0 && matchedSubs.length === 0 && subscriptions.length > 0) {
-          const deepFns = [...this.transferFunctionNamesSet(transfer)].join(',');
-          logger.info(
-            `Transfer ${txId} did not match any subscription (receiver=${transfer?.receiver}, topFunction=${fn}, deepFunctions=[${deepFns}])`
+        if (subscriptionsToDeliver.length > 0) {
+          const deliveryTasks = subscriptionsToDeliver.map((sub) =>
+            webhookService.deliverWebhook(sub, processedTransfer)
           );
-          if (FILTER_DEBUG) {
-            const senders = [...this.transferSenderAddressesSet(transfer)].slice(0, 8).join(',');
-            const receivers = [...this.transferReceiverAddressesSet(transfer)].slice(0, 8).join(',');
-            logger.debug(
-              `Transfer ${txId} filter-debug senders(sample)=${senders} receivers(sample)=${receivers}`
-            );
-          }
-          subscriptions.forEach((s) => {
-            const f = parseJson(s.filters);
-            logger.info(
-              `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, token=${f?.token || '(any)'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, collectionIdentifier=${f?.collectionIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}, amountMin=${f?.amountMin ?? '(any)'}, amountMax=${f?.amountMax ?? '(any)'}`
-            );
-          });
-        }
-
-        if (deliveryTasks.length > 0) {
           this.deliveredKeys.add(dedupeKey);
           if (this.deliveredKeys.size > DEDUPE_CACHE_MAX) {
             const arr = [...this.deliveredKeys];
@@ -312,9 +403,8 @@ class WebSocketService {
           await Promise.allSettled(deliveryTasks);
         }
 
-        const status = (transfer?.status || '').toLowerCase();
-        if (status === 'pending' && matchedSubs.length > 0) {
-          confirmationPollingService.scheduleConfirmationCheck(transfer, matchedSubs, network, this);
+        if (schedulePoll) {
+          confirmationPollingService.scheduleConfirmationCheck(processedTransfer, matchedSubs, network, this);
         }
       }
     } catch (error) {
