@@ -32,6 +32,7 @@ import ErrorState from '../components/ui/ErrorState';
 import CopyableField from '../components/ui/CopyableField';
 import SubscriptionAnalyticsSection from '../components/dashboard/SubscriptionAnalyticsSection';
 import { useNotify } from '../context/NotificationContext';
+import { DEFAULT_MAX_SUBSCRIPTIONS_PER_USER } from '../constants/subscriptionLimits';
 
 export default function SubscriptionsPage() {
   const { user, loading } = useAuth();
@@ -41,13 +42,19 @@ export default function SubscriptionsPage() {
   const [loadingSubs, setLoadingSubs] = useState(true);
   const [error, setError] = useState('');
   const [dense, setDense] = useState(false);
+  const [maxSubscriptionsPerUser, setMaxSubscriptionsPerUser] = useState(DEFAULT_MAX_SUBSCRIPTIONS_PER_USER);
 
   const loadSubscriptions = React.useCallback(() => {
     setLoadingSubs(true);
     setError('');
     subscriptionAPI
       .getAll()
-      .then((data) => setSubscriptions(data.subscriptions || []))
+      .then((data) => {
+        setSubscriptions(data.subscriptions || []);
+        if (typeof data.maxSubscriptionsPerUser === 'number') {
+          setMaxSubscriptionsPerUser(data.maxSubscriptionsPerUser);
+        }
+      })
       .catch(() => setError('Could not fetch subscriptions. Check connection and try again.'))
       .finally(() => setLoadingSubs(false));
   }, []);
@@ -73,15 +80,33 @@ export default function SubscriptionsPage() {
 
   if (loading || !user) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} />;
 
+  const atSubscriptionLimit = subscriptions.length >= maxSubscriptionsPerUser;
+
   return (
     <Box>
       <PageHeader
         title="Subscriptions"
         description="Manage webhook subscriptions, filters, and target networks."
         actions={
-          <Button component={Link} to="/subscriptions/new" variant="contained" startIcon={<AddRoundedIcon />}>
-            New Subscription
-          </Button>
+          <Tooltip
+            title={
+              atSubscriptionLimit
+                ? `You already have ${maxSubscriptionsPerUser} subscriptions (maximum per wallet). Delete one to add another.`
+                : ''
+            }
+          >
+            <span>
+              <Button
+                component={Link}
+                to="/subscriptions/new"
+                variant="contained"
+                startIcon={<AddRoundedIcon />}
+                disabled={atSubscriptionLimit}
+              >
+                New Subscription
+              </Button>
+            </span>
+          </Tooltip>
         }
       />
 

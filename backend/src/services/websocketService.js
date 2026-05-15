@@ -19,6 +19,12 @@ const ENRICH_DISABLED =
   process.env.DISABLE_WS_TRANSFER_ENRICHMENT === 'true' ||
   process.env.DISABLE_WS_TRANSFER_ENRICHMENT === '1';
 
+/** MultiversX caps subscribeCustomTransfers per WebSocket session (default 10). */
+const MVX_WS_MAX_SUBSCRIPTIONS_PER_SOCKET = Math.min(
+  50,
+  Math.max(1, parseInt(process.env.MVX_WS_MAX_SUBSCRIPTIONS_PER_SOCKET, 10) || 10)
+);
+
 /**
  * Serialize API payload to a stable key for deduplication of API subscriptions.
  * Multiple subscriptions with the same payload share one WebSocket subscription.
@@ -29,8 +35,9 @@ function payloadKey(payload) {
 
 class WebSocketService {
   constructor() {
-    this.sockets = new Map(); // network -> socket instance
-    this.subscriptions = new Map(); // subscriptionId -> {socket, payload, network}
+    /** @type {Map<string, Array<{ socket: import('socket.io-client').Socket, payloadKeys: Set<string>, shardIndex: number }>>} */
+    this.shardBuckets = new Map(); // network -> shards (each shard = one MVX WS connection)
+    this.subscriptions = new Map(); // subscriptionId -> { shard, payload, network }
     this.payloadToSubscriptionIds = new Map(); // payloadKey -> Set<subscriptionId>
     this.deliveredKeys = new Set(); // txHash|status for deduplication (timestamp removed for stronger dedupe)
     this.apiEndpoints = {
@@ -61,62 +68,117 @@ class WebSocketService {
     }
   }
 
-  async getSocket(network = 'mainnet') {
-    if (this.sockets.has(network)) {
-      return this.sockets.get(network);
-    }
+  /** MVX shard that already owns this subscribe payload on this network. */
+  findShardForPayload(network, payloadKeyStr) {
+    const shards = this.shardBuckets.get(network) || [];
+    return shards.find((s) => s.payloadKeys.has(payloadKeyStr)) || null;
+  }
 
+  /**
+   * One MVX WebSocket session (~10 subscribeCustomTransfers max). Opens a new connection.
+   */
+  async createShard(network) {
+    const wsUrl = await this.getWebSocketUrl(network);
+    const shards = this.shardBuckets.get(network) || [];
+    const shardIndex = shards.length;
+
+    const socket = io(wsUrl, {
+      path: '/ws/subscription',
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 30000,
+      randomizationFactor: 0.5,
+      timeout: 30000,
+      pingTimeout: 60000,
+      pingInterval: 25000
+    });
+
+    const shard = {
+      network,
+      shardIndex,
+      socket,
+      payloadKeys: new Set()
+    };
+
+    socket.on('connect', () => {
+      logger.info(`WebSocket shard ${shardIndex} connected to ${network}`);
+      this.resubscribeShard(shard);
+    });
+
+    socket.on('disconnect', (reason) => {
+      logger.warn(`WebSocket shard ${shardIndex} disconnected from ${network}: ${reason}`);
+    });
+
+    socket.on('connect_error', (error) => {
+      const errMsg = error?.message ?? (typeof error === 'string' ? error : JSON.stringify(error));
+      logger.error(`WebSocket shard ${shardIndex} connection error for ${network}: ${errMsg}`);
+    });
+
+    socket.on('error', (errorData) => {
+      const errMsg = errorData?.message ?? (typeof errorData === 'string' ? errorData : JSON.stringify(errorData));
+      logger.error(`WebSocket shard ${shardIndex} server error for ${network}: ${errMsg}`);
+    });
+
+    socket.on('customTransferUpdate', async (data) => {
+      await this.handleTransferUpdate(network, data);
+    });
+
+    if (!this.shardBuckets.has(network)) {
+      this.shardBuckets.set(network, []);
+    }
+    this.shardBuckets.get(network).push(shard);
+
+    logger.info(
+      `Opened WebSocket shard ${shardIndex} for ${network} (MVX limit ${MVX_WS_MAX_SUBSCRIPTIONS_PER_SOCKET} subscribe payloads per shard)`
+    );
+
+    return shard;
+  }
+
+  /** Pick a shard with capacity or open another connection (MVX max subscriptions per socket). */
+  async acquireShardWithCapacity(network) {
+    const shards = this.shardBuckets.get(network) || [];
+    for (const shard of shards) {
+      if (shard.payloadKeys.size < MVX_WS_MAX_SUBSCRIPTIONS_PER_SOCKET) {
+        return shard;
+      }
+    }
+    return this.createShard(network);
+  }
+
+  resubscribeShard(shard) {
     try {
-      const wsUrl = await this.getWebSocketUrl(network);
-      const socket = io(wsUrl, {
-        path: '/ws/subscription',
-        transports: ['websocket', 'polling'],
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 2000,
-        reconnectionDelayMax: 30000,
-        randomizationFactor: 0.5,
-        timeout: 30000,
-        pingTimeout: 60000,
-        pingInterval: 25000
-      });
-
-      // Set up event handlers
-      socket.on('connect', () => {
-        logger.info(`WebSocket connected to ${network}`);
-        this.resubscribeNetwork(network, socket);
-      });
-
-      socket.on('disconnect', (reason) => {
-        logger.warn(`WebSocket disconnected from ${network}: ${reason}`);
-      });
-
-      socket.on('connect_error', (error) => {
-        const errMsg = error?.message ?? (typeof error === 'string' ? error : JSON.stringify(error));
-        logger.error(`WebSocket connection error for ${network}: ${errMsg}`);
-      });
-
-      socket.on('error', (errorData) => {
-        const errMsg = errorData?.message ?? (typeof errorData === 'string' ? errorData : JSON.stringify(errorData));
-        logger.error(`WebSocket server error for ${network}: ${errMsg}`);
-      });
-
-      // Handle custom transfer updates
-      socket.on('customTransferUpdate', async (data) => {
-        await this.handleTransferUpdate(network, data);
-      });
-
-      this.sockets.set(network, socket);
-      return socket;
+      if (shard.payloadKeys.size === 0) return;
+      for (const key of shard.payloadKeys) {
+        const payload = JSON.parse(key);
+        shard.socket.emit('subscribeCustomTransfers', payload);
+      }
+      logger.info(
+        `Re-subscribed shard ${shard.shardIndex} on ${shard.network}: ${shard.payloadKeys.size} payload(s)`
+      );
     } catch (error) {
-      logger.error(`Failed to create WebSocket for ${network}:`, error);
-      throw error;
+      logger.error(`Failed to re-subscribe shard ${shard.shardIndex} (${shard.network}):`, error.message);
     }
+  }
+
+  pruneEmptyShard(network, shard) {
+    if (shard.payloadKeys.size > 0) return;
+    try {
+      shard.socket.disconnect();
+    } catch (e) {
+      logger.warn(`Shard ${shard.shardIndex} disconnect: ${e.message}`);
+    }
+    const shards = this.shardBuckets.get(network);
+    if (!shards) return;
+    const idx = shards.indexOf(shard);
+    if (idx !== -1) shards.splice(idx, 1);
+    logger.info(`Removed empty WebSocket shard ${shard.shardIndex} for ${network}`);
   }
 
   async createSubscription(subscriptionId, filters, network = 'mainnet') {
     try {
-      const socket = await this.getSocket(network);
       
       // Validate at least one filter is provided
       const filterKeys = Object.keys(filters).filter(key => filters[key]);
@@ -171,17 +233,31 @@ class WebSocketService {
       const existing = this.payloadToSubscriptionIds.get(key);
       const isFirstForPayload = !existing || existing.size === 0;
 
+      let shard;
       if (isFirstForPayload) {
+        shard = await this.acquireShardWithCapacity(network);
         this.payloadToSubscriptionIds.set(key, new Set([subscriptionId]));
-        socket.emit('subscribeCustomTransfers', payload);
-        logger.info(`Creating subscription ${subscriptionId} (first for payload), emitting subscribeCustomTransfers`);
+        shard.payloadKeys.add(key);
+        shard.socket.emit('subscribeCustomTransfers', payload);
+        logger.info(
+          `Creating subscription ${subscriptionId} (first for payload, shard ${shard.shardIndex}), emitting subscribeCustomTransfers`
+        );
       } else {
         existing.add(subscriptionId);
+        shard = this.findShardForPayload(network, key);
+        if (!shard) {
+          logger.error(`Missing shard for payload ${key}; recovering with new MVX subscribe`);
+          shard = await this.acquireShardWithCapacity(network);
+          if (!shard.payloadKeys.has(key)) {
+            shard.payloadKeys.add(key);
+            shard.socket.emit('subscribeCustomTransfers', payload);
+          }
+        }
         logger.info(`Creating subscription ${subscriptionId} (merged with existing payload, ${existing.size} total)`);
       }
 
       this.subscriptions.set(subscriptionId, {
-        socket,
+        shard,
         payload,
         network
       });
@@ -201,14 +277,16 @@ class WebSocketService {
         return { success: false, message: 'Subscription not found' };
       }
 
-      const { socket, payload } = subscription;
+      const { shard, payload } = subscription;
       const key = payloadKey(payload);
       const ids = this.payloadToSubscriptionIds.get(key);
       if (ids) {
         ids.delete(subscriptionId);
         if (ids.size === 0) {
           this.payloadToSubscriptionIds.delete(key);
-          socket.emit('unsubscribeCustomTransfers', payload);
+          shard.socket.emit('unsubscribeCustomTransfers', payload);
+          shard.payloadKeys.delete(key);
+          this.pruneEmptyShard(subscription.network, shard);
           logger.info(`Removed subscription ${subscriptionId} (last for payload), emitting unsubscribeCustomTransfers`);
         } else {
           logger.info(`Removed subscription ${subscriptionId} (${ids.size} subscription(s) still using payload)`);
@@ -656,38 +734,24 @@ class WebSocketService {
     }
   }
 
-  resubscribeNetwork(network, socket) {
-    try {
-      const payloadsForNetwork = new Set();
-      for (const [, subscription] of this.subscriptions) {
-        if (subscription.network !== network) continue;
-        payloadsForNetwork.add(payloadKey(subscription.payload));
-      }
-      for (const key of payloadsForNetwork) {
-        const payload = JSON.parse(key);
-        socket.emit('subscribeCustomTransfers', payload);
-      }
-      if (payloadsForNetwork.size > 0) {
-        logger.info(`Re-subscribed ${payloadsForNetwork.size} unique API payload(s) for ${network}`);
-      }
-    } catch (error) {
-      logger.error(`Failed to re-subscribe subscriptions for ${network}:`, error.message);
-    }
-  }
-
   async cleanup() {
-    // Unsubscribe all and close connections
     const ids = [...this.subscriptions.keys()];
     for (const subscriptionId of ids) {
       await this.removeSubscription(subscriptionId);
     }
 
-    for (const [network, socket] of this.sockets) {
-      socket.disconnect();
-      logger.info(`Disconnected WebSocket for ${network}`);
+    for (const shards of this.shardBuckets.values()) {
+      for (const shard of shards) {
+        try {
+          shard.socket.disconnect();
+          logger.info(`Disconnected WebSocket shard ${shard.shardIndex} for ${shard.network}`);
+        } catch (e) {
+          logger.warn(`Shard disconnect: ${e.message}`);
+        }
+      }
     }
 
-    this.sockets.clear();
+    this.shardBuckets.clear();
     this.subscriptions.clear();
     this.payloadToSubscriptionIds.clear();
     this.deliveredKeys.clear();

@@ -14,6 +14,7 @@ import {
   Select,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
@@ -23,6 +24,7 @@ import { useNotify } from '../context/NotificationContext';
 import PageHeader from '../components/ui/PageHeader';
 import SectionCard from '../components/ui/SectionCard';
 import ErrorState from '../components/ui/ErrorState';
+import { DEFAULT_MAX_SUBSCRIPTIONS_PER_USER } from '../constants/subscriptionLimits';
 
 export default function CreateSubscriptionPage() {
   const { user, loading } = useAuth();
@@ -52,6 +54,30 @@ export default function CreateSubscriptionPage() {
   const [error, setError] = useState('');
   const [loadingExisting, setLoadingExisting] = useState(false);
   const [loadError, setLoadError] = useState('');
+  /** Existing subscriptions count + server limit (create flow only). */
+  const [subscriptionQuota, setSubscriptionQuota] = useState(null);
+
+  useEffect(() => {
+    if (!user || isEdit) return;
+    subscriptionAPI
+      .getAll()
+      .then((data) => {
+        const list = data.subscriptions || [];
+        setSubscriptionQuota({
+          count: list.length,
+          limit:
+            typeof data.maxSubscriptionsPerUser === 'number'
+              ? data.maxSubscriptionsPerUser
+              : DEFAULT_MAX_SUBSCRIPTIONS_PER_USER,
+        });
+      })
+      .catch(() =>
+        setSubscriptionQuota({
+          count: null,
+          limit: DEFAULT_MAX_SUBSCRIPTIONS_PER_USER,
+        })
+      );
+  }, [user, isEdit]);
 
   useEffect(() => {
     if (!user) {
@@ -116,6 +142,19 @@ export default function CreateSubscriptionPage() {
       setError('Name and webhook URL are required');
       return;
     }
+
+    const atLimit =
+      !isEdit &&
+      subscriptionQuota &&
+      subscriptionQuota.count != null &&
+      subscriptionQuota.count >= subscriptionQuota.limit;
+    if (atLimit) {
+      setError(
+        `Maximum of ${subscriptionQuota.limit} subscriptions per wallet. Remove one on the Subscriptions page first.`
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       if (isEdit) {
@@ -138,6 +177,14 @@ export default function CreateSubscriptionPage() {
   if (loading || !user) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} />;
   if (loadingExisting) return <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} />;
 
+  const atLimitCreate =
+    !isEdit &&
+    subscriptionQuota &&
+    subscriptionQuota.count != null &&
+    subscriptionQuota.count >= subscriptionQuota.limit;
+
+  const subscriptionQuotaLoading = !isEdit && subscriptionQuota === null;
+
   return (
     <Box>
       <PageHeader
@@ -152,6 +199,12 @@ export default function CreateSubscriptionPage() {
       ) : (
         <SectionCard>
           <form onSubmit={handleSubmit}>
+            {!isEdit && subscriptionQuota && subscriptionQuota.count != null && (
+              <Alert severity={atLimitCreate ? 'warning' : 'info'} sx={{ mb: 2 }}>
+                Subscriptions: {subscriptionQuota.count} of {subscriptionQuota.limit} used for your wallet.
+                {atLimitCreate && ' Delete one on the Subscriptions page before creating another.'}
+              </Alert>
+            )}
             <Grid container spacing={2}>
               <Grid item xs={12}>
                 <TextField
@@ -315,14 +368,26 @@ export default function CreateSubscriptionPage() {
               )}
               <Grid item xs={12}>
                 <Box sx={{ display: 'flex', gap: 1, pt: 1 }}>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    disabled={saving}
-                    startIcon={<SaveRoundedIcon />}
+                  <Tooltip
+                    title={
+                      atLimitCreate
+                        ? `Limit reached (${subscriptionQuota.limit}). Delete a subscription first.`
+                        : subscriptionQuotaLoading
+                          ? 'Loading subscription quota…'
+                          : ''
+                    }
                   >
-                    {saving ? 'Saving...' : isEdit ? 'Update Subscription' : 'Create Subscription'}
-                  </Button>
+                    <span>
+                      <Button
+                        type="submit"
+                        variant="contained"
+                        disabled={saving || atLimitCreate || subscriptionQuotaLoading}
+                        startIcon={<SaveRoundedIcon />}
+                      >
+                        {saving ? 'Saving...' : isEdit ? 'Update Subscription' : 'Create Subscription'}
+                      </Button>
+                    </span>
+                  </Tooltip>
                   <Button variant="outlined" onClick={() => navigate('/subscriptions')}>
                     Cancel
                   </Button>

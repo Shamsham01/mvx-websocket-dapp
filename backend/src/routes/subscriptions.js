@@ -6,6 +6,7 @@ const websocketService = require('../services/websocketService');
 const webhookService = require('../services/webhookService');
 const logger = require('../utils/logger');
 const { authenticate } = require('../middleware/authenticate');
+const { MAX_SUBSCRIPTIONS_PER_USER } = require('../constants/subscriptionLimits');
 
 const hasFilterValue = (value) => {
   if (value === undefined || value === null) {
@@ -57,7 +58,11 @@ router.get('/', authenticate, async (req, res) => {
       'SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC',
       [req.user.id]
     );
-    res.json({ success: true, subscriptions: subscriptions.map(sub => ({ ...sub, filters: parseJson(sub.filters) })) });
+    res.json({
+      success: true,
+      maxSubscriptionsPerUser: MAX_SUBSCRIPTIONS_PER_USER,
+      subscriptions: subscriptions.map(sub => ({ ...sub, filters: parseJson(sub.filters) }))
+    });
   } catch (error) {
     logger.error('Get subscriptions error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -94,6 +99,21 @@ router.post('/', authenticate, async (req, res) => {
     if (!validNetworks.includes(network)) {
       return res.status(400).json({ error: 'Invalid network. Must be one of: mainnet, testnet, devnet' });
     }
+
+    const countRow = await database.get(
+      'SELECT COUNT(*)::int AS cnt FROM subscriptions WHERE user_id = ?',
+      [req.user.id]
+    );
+    const currentCount = Number(countRow?.cnt ?? 0);
+    if (currentCount >= MAX_SUBSCRIPTIONS_PER_USER) {
+      return res.status(403).json({
+        error: `Maximum of ${MAX_SUBSCRIPTIONS_PER_USER} subscriptions per wallet reached.`,
+        code: 'SUBSCRIPTION_LIMIT',
+        limit: MAX_SUBSCRIPTIONS_PER_USER,
+        currentCount
+      });
+    }
+
     const result = await database.run(
       'INSERT INTO subscriptions (user_id, name, webhook_url, filters, network, is_active) VALUES (?, ?, ?, ?, ?, true)',
       [req.user.id, name, webhook_url, JSON.stringify(filters), network]
