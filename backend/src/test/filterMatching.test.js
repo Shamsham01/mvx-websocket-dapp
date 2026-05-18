@@ -84,4 +84,96 @@ describe('subscription filter matching', () => {
     expect(filterMatching.resolveApiTokenFilter({ token: 'EGLD' })).toBe('EGLD');
     expect(filterMatching.resolveApiTokenFilter({ token: 'USDC-c76f1f' })).toBeUndefined();
   });
+
+  it('amount min/max uses EGLD value when no tokenIdentifier', () => {
+    const tx = { value: '350000000000000000' }; // 0.35 EGLD
+    expect(
+      filterMatching.matchesFilters(tx, { amountMin: '0.35', amountMax: '0.35' })
+    ).toBe(true);
+    expect(filterMatching.matchesFilters(tx, { amountMin: '1' })).toBe(false);
+  });
+
+  it('parseAmount respects token decimals', () => {
+    expect(filterMatching.parseAmount('1', 6)).toBe(BigInt(1_000_000));
+    expect(filterMatching.parseAmount('100', 8)).toBe(BigInt(10_000_000_000));
+    expect(filterMatching.parseAmount('0.5', 18)).toBe(BigInt('500000000000000000'));
+  });
+
+  it('REWARD-cf6eac: 100 human with 8 decimals matches atomic WebSocket value', () => {
+    const tx = {
+      operations: [
+        {
+          type: 'FungibleESDT',
+          identifier: 'REWARD-cf6eac',
+          value: '10000000000',
+        },
+      ],
+    };
+    expect(
+      filterMatching.matchesFilters(tx, {
+        tokenIdentifier: 'REWARD-cf6eac',
+        tokenDecimals: 8,
+        amountMin: '100',
+        amountMax: '100',
+      })
+    ).toBe(true);
+  });
+
+  it('REWARD-cf6eac: wrong decimals (18) fails amount filter for same atomic value', () => {
+    const tx = {
+      operations: [
+        {
+          type: 'FungibleESDT',
+          identifier: 'REWARD-cf6eac',
+          value: '10000000000',
+        },
+      ],
+    };
+    expect(
+      filterMatching.matchesFilters(tx, {
+        tokenIdentifier: 'REWARD-cf6eac',
+        tokenDecimals: 18,
+        amountMin: '100',
+      })
+    ).toBe(false);
+  });
+
+  it('ESDT amount filter fails when tokenDecimals missing', () => {
+    const tx = {
+      operations: [{ type: 'FungibleESDT', identifier: 'REWARD-cf6eac', value: '10000000000' }],
+    };
+    expect(
+      filterMatching.matchesFilters(tx, {
+        tokenIdentifier: 'REWARD-cf6eac',
+        amountMin: '100',
+      })
+    ).toBe(false);
+  });
+
+  it('amount min/max uses ESDT leg when tokenIdentifier is set', () => {
+    const tx = {
+      operations: [
+        {
+          type: 'FungibleESDT',
+          identifier: 'REWARD-cf6eac',
+          value: '200000000',
+        },
+      ],
+    };
+    expect(
+      filterMatching.matchesFilters(tx, {
+        tokenIdentifier: 'REWARD-cf6eac',
+        tokenDecimals: 8,
+        amountMin: '1',
+        amountMax: '2',
+      })
+    ).toBe(true);
+    expect(
+      filterMatching.matchesFilters(tx, {
+        tokenIdentifier: 'REWARD-cf6eac',
+        tokenDecimals: 8,
+        amountMin: '3',
+      })
+    ).toBe(false);
+  });
 });

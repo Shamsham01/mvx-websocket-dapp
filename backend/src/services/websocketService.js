@@ -6,6 +6,7 @@ const database = require('../config/database');
 const webhookService = require('./webhookService');
 const confirmationPollingService = require('./confirmationPollingService');
 const filterMatching = require('./filterMatching');
+const { hydrateSubscriptionFilters } = require('./tokenMetadata');
 
 const DEDUPE_CACHE_MAX = 2000;
 
@@ -382,12 +383,14 @@ class WebSocketService {
         return;
       }
 
-      const subscriptions = await database.query(`
+      const subscriptionsRaw = await database.query(`
         SELECT s.*, u.address as user_address 
         FROM subscriptions s
         JOIN users u ON s.user_id = u.id
         WHERE s.network = ? AND s.is_active = true
       `, [network]);
+
+      const subscriptions = await hydrateSubscriptionFilters(subscriptionsRaw, network);
 
       logger.info(`Received ${data.transfers.length} transfer(s) from ${network}, ${subscriptions.length} active subscription(s)`);
 

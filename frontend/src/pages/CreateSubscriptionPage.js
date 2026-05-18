@@ -383,20 +383,28 @@ export default function CreateSubscriptionPage() {
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Amount min (EGLD)"
+                  label="Amount min"
                   value={form.filters.amountMin}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMin: e.target.value } })}
-                  placeholder="0.35"
-                  helperText="Minimum native EGLD value on this row (value field, in EGLD). Example: 0.35 for a 0.35 EGLD buy. ESDT amounts (REWARD-cf6eac) — use Token identifier, not this field."
+                  placeholder={form.filters.tokenIdentifier ? '100' : '0.35'}
+                  helperText={
+                    form.filters.tokenIdentifier
+                      ? `Minimum ${form.filters.tokenIdentifier} (human-readable). Decimals are loaded from MultiversX on save (REWARD-cf6eac uses 8, EGLD uses 18, etc.) and compared to atomic WebSocket values.`
+                      : 'Minimum native EGLD on this row (human-readable, 18 decimals). Example: 0.35. Set Token identifier (e.g. REWARD-cf6eac) for ESDT amount filters.'
+                  }
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Amount max (EGLD)"
+                  label="Amount max"
                   value={form.filters.amountMax}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMax: e.target.value } })}
-                  placeholder="5"
-                  helperText="Maximum native EGLD value on this row. ESDT rewards/tokens are not filtered by amount here."
+                  placeholder={form.filters.tokenIdentifier ? '10000' : '5'}
+                  helperText={
+                    form.filters.tokenIdentifier
+                      ? `Maximum ${form.filters.tokenIdentifier} (human-readable; chain decimals applied automatically).`
+                      : 'Maximum native EGLD on this row. Set Token identifier to apply min/max to that ESDT instead of EGLD.'
+                  }
                 />
               </Grid>
 

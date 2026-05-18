@@ -7,6 +7,7 @@ const webhookService = require('../services/webhookService');
 const logger = require('../utils/logger');
 const { authenticate } = require('../middleware/authenticate');
 const { MAX_SUBSCRIPTIONS_PER_USER } = require('../constants/subscriptionLimits');
+const { enrichFiltersWithTokenDecimals } = require('../services/tokenMetadata');
 
 const hasFilterValue = (value) => {
   if (value === undefined || value === null) {
@@ -18,7 +19,7 @@ const hasFilterValue = (value) => {
   return true;
 };
 
-const DELIVERY_OPTION_KEYS = ['onlyConfirmed'];
+const DELIVERY_OPTION_KEYS = ['onlyConfirmed', 'matchTopLevelOnly', 'egldOnly', 'tokenDecimals'];
 
 const validateFilters = (filters) => {
   if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
@@ -33,7 +34,8 @@ const validateFilters = (filters) => {
   }
 
   const apiFilterKeys = ['address', 'sender', 'receiver', 'token', 'relayer'];
-  const hasApiFilter = apiFilterKeys.some((k) => hasFilterValue(filters[k]));
+  const hasApiFilter =
+    apiFilterKeys.some((k) => hasFilterValue(filters[k])) || filters.egldOnly === true;
   const hasAmountFilter = hasFilterValue(filters.amountMin) || hasFilterValue(filters.amountMax);
 
   if (hasFilterValue(filters.function) && !hasApiFilter) {
@@ -47,6 +49,13 @@ const validateFilters = (filters) => {
   }
   if (hasAmountFilter && !hasApiFilter) {
     return 'Amount filter must be combined with at least one of: address, sender, receiver, token';
+  }
+  if (
+    hasAmountFilter &&
+    hasFilterValue(filters.tokenIdentifier) &&
+    hasFilterValue(filters.collectionIdentifier)
+  ) {
+    return 'Amount with token identifier applies to ESDT; remove collection identifier or use amount without token identifier for EGLD';
   }
 
   return null;
@@ -100,6 +109,8 @@ router.post('/', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Invalid network. Must be one of: mainnet, testnet, devnet' });
     }
 
+    const resolvedFilters = await enrichFiltersWithTokenDecimals(filters, network);
+
     const countRow = await database.get(
       'SELECT COUNT(*)::int AS cnt FROM subscriptions WHERE user_id = ?',
       [req.user.id]
@@ -116,12 +127,12 @@ router.post('/', authenticate, async (req, res) => {
 
     const result = await database.run(
       'INSERT INTO subscriptions (user_id, name, webhook_url, filters, network, is_active) VALUES (?, ?, ?, ?, ?, true)',
-      [req.user.id, name, webhook_url, JSON.stringify(filters), network]
+      [req.user.id, name, webhook_url, JSON.stringify(resolvedFilters), network]
     );
     const subscriptionId = result.id;
     let websocketError = null;
     try {
-      await websocketService.createSubscription(subscriptionId, filters, network);
+      await websocketService.createSubscription(subscriptionId, resolvedFilters, network);
     } catch (err) {
       logger.error('WebSocket subscription failed (subscription saved as inactive):', err.message);
       websocketError = err;
@@ -164,9 +175,12 @@ router.put('/:id', authenticate, async (req, res) => {
         return res.status(400).json({ error: 'Invalid webhook URL', details: webhookValidation.error });
       }
     }
+    let resolvedFilters = filters;
     if (filters !== undefined) {
       const filtersError = validateFilters(filters);
       if (filtersError) return res.status(400).json({ error: filtersError });
+      resolvedFilters = await enrichFiltersWithTokenDecimals(filters, updateData.network);
+      updateData.filters = JSON.stringify(resolvedFilters);
     }
     await database.run(
       'UPDATE subscriptions SET name = ?, webhook_url = ?, filters = ?, network = ?, is_active = ?, updated_at = ? WHERE id = ?',
@@ -175,7 +189,8 @@ router.put('/:id', authenticate, async (req, res) => {
     try {
       await websocketService.removeSubscription(req.params.id);
       if (updateData.is_active) {
-        const filtersToUse = filters !== undefined ? filters : parseJson(existing.filters);
+        const filtersToUse =
+          filters !== undefined ? resolvedFilters : parseJson(existing.filters);
         const networkToUse = network !== undefined ? network : existing.network;
         await websocketService.createSubscription(req.params.id, filtersToUse, networkToUse);
       }

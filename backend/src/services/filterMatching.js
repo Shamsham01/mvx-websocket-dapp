@@ -97,23 +97,97 @@ function transferHasCollection(transfer, targetCollection, topLevelOnly = false)
   return false;
 }
 
-function parseAmount(value) {
+/**
+ * Parse human-readable amount to atomic units (wei-style).
+ * @param {string|number} value - e.g. "100", "0.35"
+ * @param {number} decimals - token decimals from chain (EGLD = 18)
+ */
+function parseAmount(value, decimals = 18) {
   if (value === undefined || value === null || value === '') return null;
   const s = String(value).trim();
   if (!s) return null;
-  const E18 = BigInt('1000000000000000000');
+
+  let dec =
+    typeof decimals === 'number' && Number.isFinite(decimals) ? Math.floor(decimals) : 18;
+  if (dec < 0 || dec > 18) dec = 18;
+
+  const factor = BigInt(10) ** BigInt(dec);
   if (s.includes('.')) {
     const [intPart, decPart] = s.split('.');
-    const padded = (decPart || '').padEnd(18, '0').slice(0, 18);
-    return BigInt(intPart || '0') * E18 + BigInt(padded);
+    const padded = (decPart || '').padEnd(dec, '0').slice(0, dec);
+    return BigInt(intPart || '0') * factor + BigInt(padded || '0');
   }
-  return BigInt(s) * E18;
+  return BigInt(s) * factor;
 }
 
 function transferValue(transfer) {
   const v = transfer?.value ?? transfer?.amount;
   if (v === undefined || v === null) return BigInt(0);
   return BigInt(String(v));
+}
+
+function tokenIdMatches(candidate, targetToken) {
+  const id = normalizeValue(candidate);
+  if (!id || !targetToken) return false;
+  return id === targetToken || id.startsWith(`${targetToken}-`);
+}
+
+/**
+ * Largest matching ESDT leg amount (atomic units) for tokenIdentifier on this row.
+ */
+function transferEsdtAmount(transfer, targetToken, topLevelOnly = false) {
+  let max = BigInt(0);
+  const consider = (tokenRef, value) => {
+    if (!tokenIdMatches(tokenRef, targetToken)) return;
+    try {
+      const amt = BigInt(String(value ?? 0));
+      if (amt > max) max = amt;
+    } catch {
+      /* ignore malformed values */
+    }
+  };
+
+  for (const t of transfer?.action?.arguments?.transfers || []) {
+    consider(t?.token || t?.identifier, t?.value);
+  }
+
+  if (!topLevelOnly) {
+    for (const op of transfer?.operations || []) {
+      const type = normalizeValue(op?.type);
+      if (type === 'egld' || type === 'nft') continue;
+      consider(op?.identifier || op?.tokenIdentifier || op?.token, op?.value);
+    }
+  }
+
+  return max;
+}
+
+/**
+ * Amount used for min/max filters: EGLD native value, or ESDT leg when tokenIdentifier is set.
+ */
+function transferAmountForFilters(transfer, filters, topLevelOnly = false) {
+  const tokenId = filters?.tokenIdentifier
+    ? normalizeValue(filters.tokenIdentifier)
+    : null;
+  if (tokenId) {
+    return transferEsdtAmount(transfer, tokenId, topLevelOnly);
+  }
+  return transferValue(transfer);
+}
+
+/**
+ * Decimals for human-readable min/max → atomic comparison.
+ * EGLD: always 18. ESDT: requires tokenDecimals from chain (never assume 18).
+ */
+function resolveAmountDecimals(filters) {
+  if (!filters?.tokenIdentifier) {
+    return 18;
+  }
+  const d = Number(filters.tokenDecimals);
+  if (Number.isInteger(d) && d >= 0 && d <= 18) {
+    return d;
+  }
+  return null;
 }
 
 function resolveApiTokenFilter(filters) {
@@ -210,14 +284,23 @@ function matchesFilters(transfer, filters) {
     }
   }
 
-  const txValue = transferValue(transfer);
-  if (normalizedFilters.amountMin != null) {
-    const minVal = parseAmount(normalizedFilters.amountMin);
-    if (minVal != null && txValue < minVal) return false;
-  }
-  if (normalizedFilters.amountMax != null) {
-    const maxVal = parseAmount(normalizedFilters.amountMax);
-    if (maxVal != null && txValue > maxVal) return false;
+  const hasAmountMin = normalizedFilters.amountMin != null && normalizedFilters.amountMin !== '';
+  const hasAmountMax = normalizedFilters.amountMax != null && normalizedFilters.amountMax !== '';
+  if (hasAmountMin || hasAmountMax) {
+    const txValue = transferAmountForFilters(transfer, normalizedFilters, topLevelOnly);
+    const decimals = resolveAmountDecimals(normalizedFilters);
+    if (decimals == null) {
+      return false;
+    }
+
+    if (hasAmountMin) {
+      const minVal = parseAmount(normalizedFilters.amountMin, decimals);
+      if (minVal != null && txValue < minVal) return false;
+    }
+    if (hasAmountMax) {
+      const maxVal = parseAmount(normalizedFilters.amountMax, decimals);
+      if (maxVal != null && txValue > maxVal) return false;
+    }
   }
 
   return true;
@@ -233,6 +316,9 @@ module.exports = {
   transferHasCollection,
   parseAmount,
   transferValue,
+  transferEsdtAmount,
+  transferAmountForFilters,
+  resolveAmountDecimals,
   resolveApiTokenFilter,
   matchesFilters,
 };
