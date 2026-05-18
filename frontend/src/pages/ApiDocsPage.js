@@ -3,7 +3,7 @@ import { Box, Button, Stack, Typography } from '@mui/material';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
-import { alpha } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useGetLoginInfo } from '@multiversx/sdk-dapp/out/react/loginInfo/useGetLoginInfo';
 import SwaggerUI from 'swagger-ui-react';
 import 'swagger-ui-react/swagger-ui.css';
@@ -16,6 +16,7 @@ import { useNotify } from '../context/NotificationContext';
 const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 export default function ApiDocsPage() {
+  const theme = useTheme();
   const { loginWithNativeAuth } = useAuth();
   const notify = useNotify();
   const loginInfo = useGetLoginInfo();
@@ -103,7 +104,7 @@ export default function ApiDocsPage() {
         description={`Server: ${apiBaseUrl}`}
         sx={{
           '& .swagger-ui': {
-            '--swagger-ui-font-family': '"Inter", "Roboto", "Segoe UI", sans-serif',
+            '--swagger-ui-font-family': `"Outfit", "Segoe UI", "Helvetica Neue", sans-serif`,
             background: 'transparent',
             color: '#ecf2ff'
           },
@@ -140,8 +141,8 @@ export default function ApiDocsPage() {
             color: '#ecf2ff'
           },
           '& .swagger-ui .btn.authorize': {
-            borderColor: alpha('#46d9ff', 0.55),
-            color: '#46d9ff'
+            borderColor: alpha(theme.palette.primary.main, 0.55),
+            color: theme.palette.primary.light,
           },
           '& .swagger-ui .info .title, & .swagger-ui .info p, & .swagger-ui .opblock-summary-path, & .swagger-ui .opblock-summary-description, & .swagger-ui .parameter__name, & .swagger-ui .parameter__type, & .swagger-ui .response-col_status, & .swagger-ui .response-col_description, & .swagger-ui table thead tr td, & .swagger-ui table thead tr th': {
             color: '#ecf2ff'
@@ -190,17 +191,17 @@ export default function ApiDocsPage() {
             color: '#e2e8f0'
           },
           '& .swagger-ui .dialog-ux .auth-btn-wrapper .btn-done': {
-            background: 'linear-gradient(90deg, #46d9ff 0%, #8a7cff 100%)',
+            backgroundColor: theme.palette.primary.main,
             borderColor: 'transparent',
-            color: '#05111d',
-            fontWeight: 700
+            color: theme.palette.primary.contrastText,
+            fontWeight: 700,
           },
           '& .swagger-ui .btn.execute': {
-            background: 'linear-gradient(90deg, #46d9ff 0%, #8a7cff 100%)',
+            backgroundColor: theme.palette.primary.main,
             borderColor: 'transparent',
-            color: '#05111d',
-            fontWeight: 700
-          }
+            color: theme.palette.primary.contrastText,
+            fontWeight: 700,
+          },
         }}
       >
         <Stack direction="row" spacing={1.4} alignItems="center" sx={{ mb: 2 }}>

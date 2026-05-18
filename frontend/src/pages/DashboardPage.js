@@ -13,9 +13,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TableContainer,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -104,6 +106,7 @@ export default function DashboardPage() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
+  const isNarrow = useMediaQuery(theme.breakpoints.down('sm'));
 
   const [rawTransfers, setRawTransfers] = useState([]);
   const [priceUsd, setPriceUsd] = useState(0);
@@ -195,7 +198,16 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Track MakeX usage fees paid in REWARD to the protocol treasury—pulled live from MultiversX."
         actions={
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ sm: 'center' }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            sx={{
+              width: '100%',
+              '& .MuiChip-root': { alignSelf: { xs: 'flex-start', sm: 'center' }, maxWidth: '100%', height: 'auto' },
+              '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } },
+            }}
+          >
             <Chip
               size="small"
               label={`${REWARD_TOKEN_ID} @ ${priceUsd ? formatUsd(priceUsd) : '…'} / token`}
@@ -217,7 +229,11 @@ export default function DashboardPage() {
         }
       />
 
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: 'block', mb: 2, maxWidth: '72ch' }}
+      >
         USD amounts use the latest REWARD price from the public token endpoint (
         <Typography component="span" variant="caption" sx={{ color: 'primary.light' }}>
           denominated=true
@@ -236,22 +252,32 @@ export default function DashboardPage() {
         description="Applies to the primary KPIs below (call count, totals, averages)."
         sx={{ mb: 2 }}
         action={
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={kpiPeriod}
-            onChange={(_, v) => v && setKpiPeriod(v)}
+          <Box
             sx={{
-              flexWrap: 'wrap',
-              '& .MuiToggleButton-root': { px: 1.5, py: 0.6, textTransform: 'none' },
+              display: 'flex',
+              gap: 0.75,
+              flexWrap: 'nowrap',
+              overflowX: 'auto',
+              pb: 0.25,
+              maxWidth: '100%',
+              WebkitOverflowScrolling: 'touch',
+              '& .MuiToggleButtonGroup-root': { flexShrink: 0 },
+              '& .MuiToggleButton-root': { px: 1.4, py: 0.55, textTransform: 'none', flexShrink: 0 },
             }}
           >
-            {KPI_PERIODS.map((p) => (
-              <ToggleButton key={p.key} value={p.key}>
-                {p.label}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={kpiPeriod}
+              onChange={(_, v) => v && setKpiPeriod(v)}
+            >
+              {KPI_PERIODS.map((p) => (
+                <ToggleButton key={p.key} value={p.key}>
+                  {p.label}
+                </ToggleButton>
+              ))}
+            </ToggleButtonGroup>
+          </Box>
         }
       />
 
@@ -343,16 +369,24 @@ export default function DashboardPage() {
         </Grid>
       </SectionCard>
 
-      <SectionCard
+          <SectionCard
         title="Cost over time"
         description="Daily or cumulative series; adjust denomination and horizon with the controls."
         sx={{ mt: 3 }}
         action={
           <Stack
-            direction={{ xs: 'column', sm: 'row' }}
+            direction="row"
             spacing={1}
-            alignItems={{ sm: 'center' }}
-            flexWrap="wrap"
+            flexWrap="nowrap"
+            sx={{
+              overflowX: 'auto',
+              maxWidth: '100%',
+              gap: 1,
+              WebkitOverflowScrolling: 'touch',
+              pb: 0.5,
+              '& .MuiToggleButtonGroup-root': { flexShrink: 0 },
+              '& .MuiToggleButton-root': { flexShrink: 0 },
+            }}
           >
             <ToggleButtonGroup
               exclusive
@@ -388,7 +422,7 @@ export default function DashboardPage() {
         }
       >
         {loadingData && !chartData.length ? (
-          <Skeleton variant="rounded" height={360} />
+          <Skeleton variant="rounded" sx={{ height: { xs: 268, sm: 320, md: 368 } }} />
         ) : chartData.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No REWARD usage payments to{' '}
@@ -398,14 +432,19 @@ export default function DashboardPage() {
             were found for this wallet yet.
           </Typography>
         ) : (
-          <Box sx={{ width: '100%', height: 380 }}>
+          <Box sx={{ width: '100%', height: { xs: 268, sm: 320, md: 368 } }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid stroke={alpha(theme.palette.text.secondary, 0.14)} vertical={false} />
+              <LineChart data={chartData} margin={{ top: 10, left: -10, right: 4, bottom: 0 }}>
+                <CartesianGrid stroke={alpha(theme.palette.text.secondary, 0.12)} vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: theme.palette.text.secondary, fontSize: 11 }}
-                  minTickGap={16}
+                  tick={{ fill: theme.palette.text.secondary, fontSize: isNarrow ? 9 : 11 }}
+                  interval="preserveStartEnd"
+                  tickMargin={isNarrow ? 4 : 8}
+                  minTickGap={isNarrow ? 2 : 16}
+                  height={isNarrow ? 52 : 32}
+                  angle={isNarrow ? -22 : 0}
+                  textAnchor={isNarrow ? 'end' : 'middle'}
                 />
                 <YAxis
                   tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
@@ -435,10 +474,12 @@ export default function DashboardPage() {
                 <Line
                   type="monotone"
                   dataKey={lineDataKey}
-                  stroke={chartMetric === 'usd' ? theme.palette.secondary.light : theme.palette.primary.light}
-                  strokeWidth={2.6}
+                  stroke={
+                    chartMetric === 'usd' ? theme.palette.primary.light : theme.palette.secondary.light
+                  }
+                  strokeWidth={2.4}
                   dot={false}
-                  activeDot={{ r: 5.2, fill: theme.palette.secondary.main }}
+                  activeDot={{ r: 5, fill: theme.palette.primary.main }}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -464,7 +505,15 @@ export default function DashboardPage() {
             Nothing to list yet.
           </Typography>
         ) : (
-          <Table size="small" sx={{ border: `1px solid ${theme.palette.divider}`, borderRadius: 2 }}>
+          <TableContainer
+            sx={{
+              overflowX: 'auto',
+              borderRadius: 2,
+              border: `1px solid ${theme.palette.divider}`,
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            <Table size="small" sx={{ minWidth: 620 }}>
             <TableHead>
               <TableRow>
                 <TableCell>When (UTC)</TableCell>
@@ -488,7 +537,7 @@ export default function DashboardPage() {
                     </TableCell>
                     <TableCell align="right">{formatReward(r.reward)}</TableCell>
                     <TableCell align="right">{formatUsd(r.reward * priceUsd)}</TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: { xs: 1, sm: undefined } }}>
                       <Button
                         size="small"
                         href={`https://explorer.multiversx.com/transactions/${r.id}`}
@@ -502,6 +551,7 @@ export default function DashboardPage() {
                 ))}
             </TableBody>
           </Table>
+          </TableContainer>
         )}
       </SectionCard>
     </Box>

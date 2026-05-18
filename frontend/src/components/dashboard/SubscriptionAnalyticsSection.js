@@ -7,6 +7,7 @@ import {
   Skeleton,
   Stack,
   Typography,
+  useMediaQuery,
   useTheme,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
@@ -77,6 +78,7 @@ function buildTimelineRows(callsPerDay, selectedSubscriptionId) {
  */
 export default function SubscriptionAnalyticsSection({ user }) {
   const theme = useTheme();
+  const isNarrow = useMediaQuery(theme.breakpoints.down('sm'));
   const [dashboard, setDashboard] = useState(null);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(null);
   const [error, setError] = useState('');
@@ -121,7 +123,7 @@ export default function SubscriptionAnalyticsSection({ user }) {
 
   return (
     <Box sx={{ mt: 4 }}>
-      <Typography variant="h4" sx={{ mb: 2 }}>
+      <Typography variant="h4" sx={{ mb: 2, fontSize: { xs: '1.35rem', sm: '1.5rem', md: '1.75rem' } }}>
         Webhook &amp; subscription analytics
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
@@ -195,6 +197,7 @@ export default function SubscriptionAnalyticsSection({ user }) {
               onClick={() => setSelectedSubscriptionId(null)}
               variant="outlined"
               startIcon={<FilterAltOffRoundedIcon />}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
             >
               Clear Filter
             </Button>
@@ -203,18 +206,18 @@ export default function SubscriptionAnalyticsSection({ user }) {
       >
         {dashboard ? (
           subscriptionChartRows.length > 0 ? (
-            <Box sx={{ width: '100%', height: 340 }}>
+            <Box sx={{ width: '100%', height: { xs: 280, sm: 320, md: 356 } }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subscriptionChartRows} onClick={handleBarClick}>
-                  <CartesianGrid stroke={alpha(theme.palette.text.secondary, 0.15)} vertical={false} />
+                <BarChart data={subscriptionChartRows} onClick={handleBarClick} margin={{ top: 10, left: 8, right: 8, bottom: 8 }}>
+                  <CartesianGrid stroke={alpha(theme.palette.text.secondary, 0.12)} vertical={false} />
                   <XAxis
                     dataKey="name"
-                    tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
-                    tickFormatter={(value) => truncateLabel(value, 16)}
-                    interval={0}
-                    angle={-15}
+                    tick={{ fill: theme.palette.text.secondary, fontSize: isNarrow ? 10 : 12 }}
+                    tickFormatter={(value) => truncateLabel(value, isNarrow ? 10 : 16)}
+                    interval={isNarrow ? 0 : 'preserveEnd'}
+                    angle={isNarrow ? -22 : -8}
                     textAnchor="end"
-                    height={70}
+                    height={isNarrow ? 64 : 56}
                   />
                   <YAxis allowDecimals={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
                   <Tooltip
@@ -236,8 +239,8 @@ export default function SubscriptionAnalyticsSection({ user }) {
                           key={`subscription-bar-${item.id}`}
                           fill={
                             isSelected
-                              ? theme.palette.secondary.main
-                              : alpha(theme.palette.primary.main, 0.72)
+                              ? theme.palette.primary.dark
+                              : alpha(theme.palette.primary.main, 0.5)
                           }
                           cursor="pointer"
                         />
@@ -253,7 +256,7 @@ export default function SubscriptionAnalyticsSection({ user }) {
             </Typography>
           )
         ) : (
-          <Skeleton variant="rounded" height={340} />
+          <Skeleton variant="rounded" sx={{ height: { xs: 280, sm: 320, md: 356 } }} />
         )}
       </SectionCard>
 
@@ -267,14 +270,17 @@ export default function SubscriptionAnalyticsSection({ user }) {
         sx={{ mt: 3 }}
       >
         {dashboard ? (
-          <Box sx={{ width: '100%', height: 340 }}>
+          <Box sx={{ width: '100%', height: { xs: 268, sm: 320, md: 340 } }}>
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={timelineRows}>
-                <CartesianGrid stroke={alpha(theme.palette.text.secondary, 0.14)} vertical={false} />
+              <LineChart data={timelineRows} margin={{ top: 8, left: 8, right: 6, bottom: 4 }}>
+                <CartesianGrid stroke={alpha(theme.palette.text.secondary, 0.12)} vertical={false} />
                 <XAxis
                   dataKey="label"
-                  tick={{ fill: theme.palette.text.secondary, fontSize: 12 }}
-                  minTickGap={20}
+                  tick={{ fill: theme.palette.text.secondary, fontSize: isNarrow ? 9 : 12 }}
+                  minTickGap={isNarrow ? 2 : 18}
+                  angle={isNarrow ? -22 : 0}
+                  textAnchor={isNarrow ? 'end' : 'middle'}
+                  height={isNarrow ? 48 : 36}
                 />
                 <YAxis allowDecimals={false} tick={{ fill: theme.palette.text.secondary, fontSize: 12 }} />
                 <Tooltip
@@ -296,20 +302,24 @@ export default function SubscriptionAnalyticsSection({ user }) {
                   stroke={theme.palette.primary.light}
                   strokeWidth={2.6}
                   dot={{ r: 2.6, fill: theme.palette.primary.light }}
-                  activeDot={{ r: 5.2, fill: theme.palette.secondary.main }}
+                  activeDot={{ r: 5, fill: theme.palette.primary.main }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </Box>
         ) : (
-          <Skeleton variant="rounded" height={340} />
+          <Skeleton variant="rounded" sx={{ height: { xs: 268, sm: 320, md: 340 } }} />
         )}
       </SectionCard>
 
       <SectionCard title="Wallet" sx={{ mt: 3 }}>
         <Stack spacing={1.2}>
           <CopyableField value={user.address} label="Address" />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{ '& .MuiButton-root': { width: { xs: '100%', sm: 'auto' } } }}
+          >
             <Button component={Link} to="/subscriptions/new" variant="contained" size="small">
               Create Subscription
             </Button>

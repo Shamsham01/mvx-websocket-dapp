@@ -1,7 +1,9 @@
 import React from 'react';
 import { Card, CardContent, Stack, Typography } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 
 export default function StatCard({ label, value, caption, icon }) {
+  const theme = useTheme();
   return (
     <Card
       sx={{
@@ -9,7 +11,7 @@ export default function StatCard({ label, value, caption, icon }) {
         '&:hover': {
           transform: 'translateY(-3px)',
           boxShadow: 4,
-          borderColor: 'rgba(70, 217, 255, 0.25)',
+          borderColor: alpha(theme.palette.primary.main, 0.28),
         },
       }}
     >

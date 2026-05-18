@@ -28,10 +28,25 @@ export default function AiAgentsSection() {
       <Container maxWidth="lg">
         <Grid container spacing={4} alignItems="center">
           <Grid item xs={12} md={6}>
-            <Typography variant="h2" sx={{ mb: 1.5 }}>
+            <Typography
+              variant="h2"
+              sx={{
+                mb: 1.5,
+                textAlign: { xs: 'center', md: 'left' },
+              }}
+            >
               AI Agents + MakeX
             </Typography>
-            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+            <Typography
+              variant="body1"
+              color="text.secondary"
+              sx={{
+                mb: 3,
+                maxWidth: { xs: '40ch', md: 'none' },
+                mx: { xs: 'auto', md: 0 },
+                textAlign: { xs: 'center', md: 'left' },
+              }}
+            >
               Combine Make.com AI Agents with MakeX to create wallet-equipped
               assistants that act on-chain autonomously via no-code automation.
             </Typography>

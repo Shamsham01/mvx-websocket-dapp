@@ -95,13 +95,14 @@ export default function SubscriptionsPage() {
                 : ''
             }
           >
-            <span>
+            <span style={{ width: '100%', display: 'block' }}>
               <Button
                 component={Link}
                 to="/subscriptions/new"
                 variant="contained"
                 startIcon={<AddRoundedIcon />}
                 disabled={atSubscriptionLimit}
+                sx={{ width: { xs: '100%', sm: 'auto' } }}
               >
                 New Subscription
               </Button>
@@ -136,8 +137,15 @@ export default function SubscriptionsPage() {
             />
           }
         >
-          <TableContainer sx={{ borderRadius: 2, border: '1px solid rgba(148, 163, 184, 0.16)' }}>
-            <Table stickyHeader size={dense ? 'small' : 'medium'}>
+          <TableContainer
+            sx={{
+              overflowX: 'auto',
+              borderRadius: 2,
+              border: '1px solid rgba(148, 163, 184, 0.16)',
+              WebkitOverflowScrolling: 'touch',
+            }}
+          >
+            <Table stickyHeader size={dense ? 'small' : 'medium'} sx={{ minWidth: 720 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>

@@ -262,7 +262,10 @@ export default function AppShell({ children }) {
     );
 
     return (
-      <Box sx={{ minHeight: '100vh' }}>
+      <Box sx={{ minHeight: '100dvh' }}>
+        <a href="#main-content" className="skip-link">
+          Skip to content
+        </a>
         <AppBar position="fixed" color="transparent">
           <Toolbar sx={{ minHeight: 68 }}>
             <IconButton
@@ -415,7 +418,7 @@ export default function AppShell({ children }) {
           {landingDrawerContent}
         </Drawer>
 
-        <Box component="main">
+        <Box component="main" id="main-content" tabIndex={-1}>
           <Toolbar />
           {children}
         </Box>
@@ -471,8 +474,8 @@ export default function AppShell({ children }) {
                 borderRadius: 2.5,
                 mb: 0.5,
                 '&.Mui-selected': {
-                  backgroundColor: alpha('#46d9ff', 0.14),
-                  border: '1px solid rgba(70, 217, 255, 0.24)',
+                  backgroundColor: alpha(muiTheme.palette.primary.main, 0.14),
+                  border: `1px solid ${alpha(muiTheme.palette.primary.main, 0.26)}`,
                 },
               }}
             >
@@ -488,7 +491,10 @@ export default function AppShell({ children }) {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', position: 'relative' }}>
+    <Box sx={{ display: 'flex', minHeight: '100dvh', position: 'relative' }}>
+      <a href="#main-content" className="skip-link">
+        Skip to content
+      </a>
       <AppBar position="fixed" color="transparent">
         <Toolbar sx={{ minHeight: 68 }}>
           <IconButton
@@ -548,7 +554,12 @@ export default function AppShell({ children }) {
         </Drawer>
       </Box>
 
-      <Box component="main" sx={{ flexGrow: 1, width: { md: `calc(100% - ${activeDrawerWidth}px)` } }}>
+      <Box
+        component="main"
+        id="main-content"
+        tabIndex={-1}
+        sx={{ flexGrow: 1, width: { md: `calc(100% - ${activeDrawerWidth}px)` } }}
+      >
         <Toolbar />
         <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 } }}>
           {children}

@@ -1,104 +1,125 @@
 import { alpha, createTheme } from '@mui/material/styles';
 
-const baseBackground = '#070b14';
-const surface = '#0f1628';
-const surfaceRaised = '#141d33';
-const borderColor = 'rgba(148, 163, 184, 0.16)';
-const ease = 'cubic-bezier(0.2, 0, 0, 1)';
+/** Single muted emerald accent — avoids cyan + purple “AI gradient” clichés. */
+const accent = '#5cbb9f';
+const accentRgb = '92, 187, 159';
+
+const baseBackground = '#0c1017';
+const surface = '#121a24';
+const surfaceRaised = '#161f2d';
+const borderColor = 'rgba(148, 163, 184, 0.14)';
+const easeOut = 'cubic-bezier(0.16, 1, 0.3, 1)';
 
 const theme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: '#46d9ff',
-      light: '#86ebff',
-      dark: '#1eb5dc',
-      contrastText: '#05111d',
+      main: accent,
+      light: '#82d4b8',
+      dark: '#3f8f77',
+      contrastText: '#081210',
     },
     secondary: {
-      main: '#8a7cff',
-      light: '#b7aeff',
-      dark: '#6656f5',
+      main: '#8b98a8',
+      light: '#a8b4c2',
+      dark: '#5f6b78',
+      contrastText: '#0c1017',
     },
-    success: {
-      main: '#34d399',
-    },
-    warning: {
-      main: '#f59e0b',
-    },
-    error: {
-      main: '#f87171',
-    },
+    success: { main: '#4ade95' },
+    warning: { main: '#e8a849' },
+    error: { main: '#ea8a82' },
     background: {
       default: baseBackground,
       paper: surface,
     },
     text: {
-      primary: '#ecf2ff',
+      primary: '#eef2f6',
       secondary: '#94a3b8',
     },
     divider: borderColor,
   },
-  shape: {
-    borderRadius: 14,
-  },
+  shape: { borderRadius: 14 },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Segoe UI", "Helvetica", "Arial", sans-serif',
-    h1: { fontSize: '2.5rem', fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.02em' },
-    h2: { fontSize: '2rem', fontWeight: 700, lineHeight: 1.16, letterSpacing: '-0.015em' },
-    h3: { fontSize: '1.625rem', fontWeight: 700, lineHeight: 1.2 },
-    h4: { fontSize: '1.375rem', fontWeight: 650, lineHeight: 1.28 },
-    h5: { fontSize: '1.125rem', fontWeight: 650, lineHeight: 1.32 },
-    h6: { fontSize: '1rem', fontWeight: 650, lineHeight: 1.36 },
+    fontFamily: '"Outfit", "Segoe UI", "Helvetica Neue", "Arial", sans-serif',
+    fontVariantNumeric: 'tabular-nums',
+    h1: {
+      fontSize: '2.5rem',
+      fontWeight: 700,
+      lineHeight: 1.06,
+      letterSpacing: '-0.03em',
+    },
+    h2: {
+      fontSize: '2rem',
+      fontWeight: 650,
+      lineHeight: 1.12,
+      letterSpacing: '-0.025em',
+    },
+    h3: {
+      fontSize: '1.625rem',
+      fontWeight: 650,
+      lineHeight: 1.18,
+      letterSpacing: '-0.02em',
+    },
+    h4: { fontSize: '1.375rem', fontWeight: 600, lineHeight: 1.24 },
+    h5: { fontSize: '1.125rem', fontWeight: 600, lineHeight: 1.28 },
+    h6: { fontSize: '1rem', fontWeight: 600, lineHeight: 1.32 },
     body1: { fontSize: '0.975rem', lineHeight: 1.65 },
-    body2: { fontSize: '0.875rem', lineHeight: 1.6 },
-    caption: { fontSize: '0.75rem', lineHeight: 1.5, color: '#94a3b8' },
-    button: { textTransform: 'none', fontWeight: 600, letterSpacing: 0.2 },
+    body2: { fontSize: '0.875rem', lineHeight: 1.62 },
+    caption: {
+      fontSize: '0.75rem',
+      lineHeight: 1.48,
+      color: '#94a3b8',
+      letterSpacing: '0.01em',
+    },
+    button: { textTransform: 'none', fontWeight: 600, letterSpacing: 0.02 },
   },
   shadows: [
     'none',
-    '0 1px 2px rgba(3, 7, 18, 0.3)',
-    '0 6px 20px rgba(2, 8, 20, 0.35)',
-    '0 10px 28px rgba(2, 8, 20, 0.38)',
-    '0 14px 34px rgba(2, 8, 20, 0.42)',
-    '0 20px 46px rgba(2, 8, 20, 0.46)',
-    '0 24px 52px rgba(2, 8, 20, 0.5)',
-    '0 28px 58px rgba(2, 8, 20, 0.54)',
-    '0 30px 66px rgba(2, 8, 20, 0.56)',
-    '0 36px 74px rgba(2, 8, 20, 0.58)',
-    '0 40px 84px rgba(2, 8, 20, 0.6)',
-    '0 44px 92px rgba(2, 8, 20, 0.62)',
-    '0 48px 96px rgba(2, 8, 20, 0.64)',
-    '0 52px 102px rgba(2, 8, 20, 0.66)',
-    '0 56px 112px rgba(2, 8, 20, 0.68)',
-    '0 60px 120px rgba(2, 8, 20, 0.7)',
-    '0 64px 128px rgba(2, 8, 20, 0.72)',
-    '0 70px 136px rgba(2, 8, 20, 0.74)',
-    '0 76px 146px rgba(2, 8, 20, 0.76)',
-    '0 82px 156px rgba(2, 8, 20, 0.78)',
-    '0 88px 168px rgba(2, 8, 20, 0.8)',
-    '0 94px 176px rgba(2, 8, 20, 0.82)',
-    '0 100px 186px rgba(2, 8, 20, 0.84)',
-    '0 106px 194px rgba(2, 8, 20, 0.86)',
-    '0 112px 204px rgba(2, 8, 20, 0.88)',
+    `0 1px 2px rgba(8, 12, 16, 0.45)`,
+    `0 6px 20px rgba(8, 12, 16, 0.48)`,
+    `0 10px 28px rgba(8, 12, 16, 0.5)`,
+    `0 14px 34px rgba(8, 12, 16, 0.52)`,
+    `0 20px 46px rgba(8, 12, 16, 0.54)`,
+    `0 24px 52px rgba(8, 12, 16, 0.56)`,
+    `0 28px 58px rgba(8, 12, 16, 0.58)`,
+    `0 30px 66px rgba(8, 12, 16, 0.6)`,
+    `0 36px 74px rgba(8, 12, 16, 0.62)`,
+    `0 40px 84px rgba(8, 12, 16, 0.64)`,
+    `0 44px 92px rgba(8, 12, 16, 0.66)`,
+    `0 48px 96px rgba(8, 12, 16, 0.68)`,
+    `0 52px 102px rgba(8, 12, 16, 0.7)`,
+    `0 56px 112px rgba(8, 12, 16, 0.72)`,
+    `0 60px 120px rgba(8, 12, 16, 0.73)`,
+    `0 64px 128px rgba(8, 12, 16, 0.74)`,
+    `0 70px 136px rgba(8, 12, 16, 0.75)`,
+    `0 76px 146px rgba(8, 12, 16, 0.76)`,
+    `0 82px 156px rgba(8, 12, 16, 0.77)`,
+    `0 88px 168px rgba(8, 12, 16, 0.78)`,
+    `0 94px 176px rgba(8, 12, 16, 0.79)`,
+    `0 100px 186px rgba(8, 12, 16, 0.8)`,
+    `0 106px 194px rgba(8, 12, 16, 0.81)`,
+    `0 112px 204px rgba(8, 12, 16, 0.82)`,
   ],
   components: {
     MuiCssBaseline: {
       styleOverrides: {
+        html: {
+          scrollBehavior: 'smooth',
+        },
         body: {
           backgroundImage:
-            'radial-gradient(900px 520px at 16% -10%, rgba(70, 217, 255, 0.12), transparent 65%), radial-gradient(760px 480px at 94% -6%, rgba(138, 124, 255, 0.14), transparent 62%), linear-gradient(180deg, #070b14 0%, #070c17 100%)',
-          minHeight: '100vh',
+            `radial-gradient(880px 500px at 12% -8%, rgba(${accentRgb}, 0.09), transparent 62%), radial-gradient(640px 420px at 88% 0%, rgba(${accentRgb}, 0.05), transparent 58%), radial-gradient(520px 360px at 50% 100%, rgba(148, 163, 184, 0.04), transparent 55%), linear-gradient(180deg, ${baseBackground} 0%, #0a0e13 100%)`,
+          backgroundAttachment: 'fixed',
+          minHeight: '100dvh',
+          textRendering: 'optimizeLegibility',
         },
-        '#root': {
-          minHeight: '100vh',
-        },
+        '#root': { minHeight: '100dvh' },
         '@media (prefers-reduced-motion: reduce)': {
+          html: { scrollBehavior: 'auto' },
           '*': {
             animationDuration: '0.01ms !important',
             animationIterationCount: '1 !important',
             transitionDuration: '0.01ms !important',
-            scrollBehavior: 'auto !important',
           },
         },
       },
@@ -106,88 +127,91 @@ const theme = createTheme({
     MuiAppBar: {
       styleOverrides: {
         root: {
-          backgroundColor: alpha('#0b1324', 0.86),
-          backdropFilter: 'blur(12px)',
+          backgroundColor: alpha('#111820', 0.82),
+          backdropFilter: 'blur(14px)',
           borderBottom: `1px solid ${borderColor}`,
           boxShadow: 'none',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+            boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.06)',
+          },
         },
       },
     },
     MuiDrawer: {
       styleOverrides: {
         paper: {
-          background: 'linear-gradient(180deg, rgba(15, 22, 40, 0.92), rgba(10, 17, 31, 0.95))',
+          background: `linear-gradient(180deg, ${alpha(surface, 0.94)}, ${alpha(baseBackground, 0.96)})`,
           borderRight: `1px solid ${borderColor}`,
         },
       },
     },
     MuiCard: {
-      defaultProps: {
-        elevation: 0,
-      },
+      defaultProps: { elevation: 0 },
       styleOverrides: {
         root: {
-          borderRadius: 16,
+          borderRadius: 18,
           border: `1px solid ${borderColor}`,
-          background: `linear-gradient(180deg, ${alpha(surfaceRaised, 0.92)}, ${alpha(surface, 0.94)})`,
-          transition: `transform 200ms ${ease}, box-shadow 200ms ${ease}, border-color 200ms ${ease}`,
+          background: alpha(surfaceRaised, 0.55),
+          backgroundImage: `linear-gradient(165deg, ${alpha(surfaceRaised, 0.95)} 0%, ${alpha(surface, 0.88)} 100%)`,
+          boxShadow: `
+            inset 0 1px 0 rgba(255, 255, 255, 0.05),
+            0 12px 42px rgba(6, 10, 14, 0.35)
+          `,
+          transition: `transform 220ms ${easeOut}, box-shadow 220ms ${easeOut}, border-color 220ms ${easeOut}`,
         },
       },
     },
     MuiButton: {
-      defaultProps: {
-        disableElevation: true,
-      },
+      defaultProps: { disableElevation: true },
       styleOverrides: {
         root: {
           minHeight: 40,
-          borderRadius: 11,
-          transition: `transform 150ms ${ease}, box-shadow 180ms ${ease}, background-color 180ms ${ease}, border-color 180ms ${ease}`,
-          '&:hover': {
-            transform: 'translateY(-1px)',
-          },
-          '&:active': {
-            transform: 'translateY(0)',
-          },
+          borderRadius: 12,
+          transition: `transform 180ms ${easeOut}, box-shadow 220ms ${easeOut}, background-color 200ms ${easeOut}, border-color 200ms ${easeOut}, color 180ms ${easeOut}`,
+          '&:hover': { transform: 'translateY(-1px)' },
+          '&:active': { transform: 'translateY(0) scale(0.98)' },
         },
         containedPrimary: {
-          boxShadow: '0 10px 24px rgba(70, 217, 255, 0.22)',
+          boxShadow: `0 12px 28px rgba(${accentRgb}, 0.22)`,
+          '&:hover': {
+            boxShadow: `0 14px 34px rgba(${accentRgb}, 0.26)`,
+          },
         },
       },
     },
     MuiTextField: {
-      defaultProps: {
-        fullWidth: true,
-        variant: 'outlined',
-      },
+      defaultProps: { fullWidth: true, variant: 'outlined' },
     },
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          backgroundColor: alpha('#0f172a', 0.6),
+          backgroundColor: alpha(surface, 0.55),
           '& .MuiOutlinedInput-notchedOutline': {
-            borderColor: alpha('#94a3b8', 0.24),
+            borderColor: alpha('#94a3b8', 0.22),
           },
           '&:hover .MuiOutlinedInput-notchedOutline': {
-            borderColor: alpha('#94a3b8', 0.38),
+            borderColor: alpha('#94a3b8', 0.35),
           },
           '&.Mui-focused': {
-            boxShadow: '0 0 0 4px rgba(70, 217, 255, 0.16)',
+            boxShadow: `0 0 0 3px rgba(${accentRgb}, 0.22)`,
           },
           '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
-            borderColor: alpha('#46d9ff', 0.82),
+            borderColor: alpha(accent, 0.75),
           },
-          '&.Mui-disabled': {
-            opacity: 0.62,
-          },
+          '&.Mui-disabled': { opacity: 0.62 },
         },
       },
     },
     MuiChip: {
       styleOverrides: {
         root: {
-          borderRadius: 10,
-          border: `1px solid ${alpha('#94a3b8', 0.22)}`,
+          borderRadius: 11,
+          border: `1px solid ${alpha('#94a3b8', 0.2)}`,
         },
       },
     },
@@ -196,7 +220,7 @@ const theme = createTheme({
         indicator: {
           height: 3,
           borderRadius: 999,
-          background: 'linear-gradient(90deg, #46d9ff 0%, #8a7cff 100%)',
+          backgroundColor: accent,
         },
       },
     },
@@ -204,9 +228,11 @@ const theme = createTheme({
       styleOverrides: {
         tooltip: {
           border: `1px solid ${borderColor}`,
-          background: alpha('#0b1324', 0.96),
+          backgroundColor: alpha('#111820', 0.94),
+          backdropFilter: 'blur(8px)',
           color: '#e2e8f0',
           fontSize: '0.75rem',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
         },
       },
     },
@@ -216,6 +242,7 @@ const theme = createTheme({
           border: `1px solid ${borderColor}`,
           backgroundImage: 'none',
           backgroundColor: alpha(surface, 0.98),
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
         },
       },
     },

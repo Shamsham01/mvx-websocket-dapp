@@ -124,3 +124,6 @@ Thumbs.db
 
 # Docker
 *.log
+
+# Local agent scratch / temporary clones
+.tmp/
