@@ -135,6 +135,11 @@ class Database {
     return result.rowCount > 0;
   }
 
+  /** Allow webhook retry after a failed delivery attempt. */
+  async releaseDeliveredClaim(dedupeKey) {
+    await this.pool.query('DELETE FROM delivered_transfers WHERE dedupe_key = $1', [dedupeKey]);
+  }
+
   async close() {
     await this.pool.end();
   }

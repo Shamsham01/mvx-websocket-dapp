@@ -332,12 +332,37 @@ class WebSocketService {
 
   mergeApiTxIntoTransfer(wsTransfer, apiTx) {
     if (!apiTx || typeof apiTx !== 'object') return wsTransfer;
-    return {
+    const merged = {
       ...wsTransfer,
       ...apiTx,
       txHash: wsTransfer?.txHash || apiTx.txHash,
-      hash: wsTransfer?.hash || apiTx.txHash
+      hash: wsTransfer?.hash || apiTx.hash || apiTx.txHash,
     };
+    // REST often types SCR rows as "unsigned"; keep WebSocket SmartContractResult for filters.
+    const wsType = this.normalizeValue(wsTransfer?.type);
+    if (wsType === 'smartcontractresult') {
+      merged.type = wsTransfer.type;
+    }
+    return merged;
+  }
+
+  async maybeEnrichTransfer(transfer, subscriptions, network) {
+    if (ENRICH_DISABLED) return transfer;
+    const txId = transfer?.txHash || transfer?.hash;
+    if (!txId || txId === 'unknown') return transfer;
+    const statusLower = (transfer?.status || '').toLowerCase();
+    if (statusLower !== 'pending' && statusLower !== 'success') return transfer;
+    if (!this.isThinTransferPayload(transfer)) return transfer;
+    if (!this.subscriptionsNeedNestedMatching(subscriptions)) return transfer;
+
+    const apiTx = await this.fetchTransactionDetails(network, txId);
+    if (!apiTx) return transfer;
+
+    const enriched = this.mergeApiTxIntoTransfer(transfer, apiTx);
+    logger.info(
+      `Transfer ${txId}: pre-enriched for matching (operations=${enriched?.operations?.length || 0}, type=${enriched?.type})`
+    );
+    return enriched;
   }
 
   async fetchTransactionDetails(network, txHash) {
@@ -414,39 +439,18 @@ class WebSocketService {
 
         const dedupeKey = `${txId}|${transfer?.status ?? ''}`;
         if (this.deliveredKeys.has(dedupeKey)) {
-          logger.info(`Skipping duplicate transfer ${txId} status=${transfer?.status} (already delivered, in-memory)`);
+          logger.info(
+            `Skipping duplicate transfer ${txId} status=${transfer?.status} (webhook already delivered, in-memory)`
+          );
           continue;
         }
 
-        let processedTransfer = transfer;
+        const statusLower = (transfer?.status || '').toLowerCase();
+        const processedTransfer = await this.maybeEnrichTransfer(transfer, subscriptions, network);
         let { matchedSubs, subscriptionsToDeliver } = this.evaluateTransferAgainstSubscriptions(
           processedTransfer,
           subscriptions
         );
-
-        const statusLower = (transfer?.status || '').toLowerCase();
-        if (
-          !ENRICH_DISABLED &&
-          matchedSubs.length === 0 &&
-          txId !== 'unknown' &&
-          this.isThinTransferPayload(processedTransfer) &&
-          this.subscriptionsNeedNestedMatching(subscriptions) &&
-          (statusLower === 'pending' || statusLower === 'success')
-        ) {
-          const apiTx = await this.fetchTransactionDetails(network, txId);
-          if (apiTx) {
-            processedTransfer = this.mergeApiTxIntoTransfer(transfer, apiTx);
-            ({ matchedSubs, subscriptionsToDeliver } = this.evaluateTransferAgainstSubscriptions(
-              processedTransfer,
-              subscriptions
-            ));
-            if (matchedSubs.length > 0) {
-              logger.info(
-                `Transfer ${txId}: enriched from REST for matching (operations=${processedTransfer?.operations?.length || 0}, results=${processedTransfer?.results?.length || 0})`
-              );
-            }
-          }
-        }
 
         const schedulePoll = statusLower === 'pending' && matchedSubs.length > 0;
         const hasWork = subscriptionsToDeliver.length > 0 || schedulePoll;
@@ -467,7 +471,7 @@ class WebSocketService {
             subscriptions.forEach((s) => {
               const f = parseJson(s.filters);
               logger.info(
-                `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, token=${f?.token || '(any)'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, collectionIdentifier=${f?.collectionIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}, amountMin=${f?.amountMin ?? '(any)'}, amountMax=${f?.amountMax ?? '(any)'}`
+                `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, transactionType=${f?.transactionType || '(any)'}, matchTopLevelOnly=${f?.matchTopLevelOnly ? 'yes' : 'no'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, collectionIdentifier=${f?.collectionIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}, amountMin=${f?.amountMin ?? '(any)'}, amountMax=${f?.amountMax ?? '(any)'}`
               );
             });
           }
@@ -484,15 +488,26 @@ class WebSocketService {
         }
 
         if (subscriptionsToDeliver.length > 0) {
-          const deliveryTasks = subscriptionsToDeliver.map((sub) =>
-            webhookService.deliverWebhook(sub, processedTransfer)
+          const deliveryResults = await Promise.allSettled(
+            subscriptionsToDeliver.map((sub) =>
+              webhookService.deliverWebhook(sub, processedTransfer)
+            )
           );
-          this.deliveredKeys.add(dedupeKey);
-          if (this.deliveredKeys.size > DEDUPE_CACHE_MAX) {
-            const arr = [...this.deliveredKeys];
-            this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
+          const anyDelivered = deliveryResults.some(
+            (r) => r.status === 'fulfilled' && r.value?.success === true
+          );
+          if (anyDelivered) {
+            this.deliveredKeys.add(dedupeKey);
+            if (this.deliveredKeys.size > DEDUPE_CACHE_MAX) {
+              const arr = [...this.deliveredKeys];
+              this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
+            }
+          } else {
+            await database.releaseDeliveredClaim(dedupeKey);
+            logger.warn(
+              `Transfer ${txId}: all webhook deliveries failed for ${subscriptionsToDeliver.length} subscription(s); dedupe released for retry`
+            );
           }
-          await Promise.allSettled(deliveryTasks);
         }
 
         if (schedulePoll) {
