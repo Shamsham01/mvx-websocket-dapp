@@ -337,7 +337,7 @@ export default function CreateSubscriptionPage() {
                     <MenuItem value="SmartContractResult">SmartContractResult (inner result tx)</MenuItem>
                   </Select>
                   <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
-                    Use SmartContractResult with Function ESDTNFTTransfer to receive SCR-only webhooks, not the parent buy tx.
+                    SmartContractResult includes MVX rows typed unsigned with an originalTxHash (common for NFT delivery SCRs). Pair with ESDTNFTTransfer to skip parent buy txs.
                   </Typography>
                 </FormControl>
               </Grid>

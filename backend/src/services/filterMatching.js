@@ -66,35 +66,74 @@ function transferReceiverAddressesSet(transfer) {
   return addrs;
 }
 
+function collectionInOperations(ops, target) {
+  for (const op of ops || []) {
+    const col = normalizeValue(op?.collection);
+    if (col && col === target) return true;
+    const id = normalizeValue(op?.identifier || op?.tokenIdentifier);
+    if (id && (id === target || id.startsWith(`${target}-`))) return true;
+  }
+  return false;
+}
+
 function transferHasToken(transfer, targetToken, topLevelOnly = false) {
   const target = normalizeValue(targetToken);
   const fromTransfers = (transfer?.action?.arguments?.transfers || []).some(
     (t) => normalizeValue(t?.token || t?.identifier) === target
   );
-  if (topLevelOnly) return fromTransfers;
   const fromOps = (transfer?.operations || []).some(
     (op) => normalizeValue(op?.identifier || op?.tokenIdentifier || op?.token) === target
   );
-  return fromTransfers || fromOps;
+  if (fromTransfers || fromOps) return true;
+  if (topLevelOnly) return false;
+
+  for (const r of transfer?.results || []) {
+    if (
+      (r?.action?.arguments?.transfers || []).some(
+        (t) => normalizeValue(t?.token || t?.identifier) === target
+      )
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
+/**
+ * Collection on this WebSocket row (action.transfers + operations).
+ * topLevelOnly skips nested results[] from a parent buy bundle, not this row's operations.
+ */
 function transferHasCollection(transfer, targetCollection, topLevelOnly = false) {
   const target = normalizeValue(targetCollection);
   const transfers = transfer?.action?.arguments?.transfers || [];
   for (const t of transfers) {
     const tok = normalizeValue(t?.token || t?.identifier);
-    if (tok && (tok === target || tok.startsWith(target + '-'))) return true;
+    if (tok && (tok === target || tok.startsWith(`${target}-`))) return true;
   }
+  if (collectionInOperations(transfer?.operations, target)) return true;
   if (topLevelOnly) return false;
 
-  const ops = transfer?.operations || [];
-  for (const op of ops) {
-    const col = normalizeValue(op?.collection);
-    if (col && col === target) return true;
-    const id = normalizeValue(op?.identifier || op?.tokenIdentifier);
-    if (id && (id === target || id.startsWith(target + '-'))) return true;
+  for (const r of transfer?.results || []) {
+    if (collectionInOperations(r?.operations, target)) return true;
   }
   return false;
+}
+
+/**
+ * MVX labels many SCR rows as type "unsigned" (not "SmartContractResult") when originalTxHash is set.
+ */
+function transactionTypeMatches(transfer, wantType) {
+  const want = normalizeValue(wantType);
+  const rowType = normalizeValue(transfer?.type);
+  if (!want) return true;
+
+  if (want === 'smartcontractresult') {
+    if (rowType === 'smartcontractresult') return true;
+    if (rowType === 'unsigned' && transfer?.originalTxHash) return true;
+    return false;
+  }
+
+  return rowType === want;
 }
 
 /**
@@ -208,9 +247,7 @@ function matchesFilters(transfer, filters) {
   const relayer = normalizeValue(transfer.relayer);
 
   if (normalizedFilters.transactionType) {
-    const wantType = normalizeValue(normalizedFilters.transactionType);
-    const rowType = normalizeValue(transfer?.type);
-    if (rowType !== wantType) {
+    if (!transactionTypeMatches(transfer, normalizedFilters.transactionType)) {
       return false;
     }
   }
@@ -320,5 +357,6 @@ module.exports = {
   transferAmountForFilters,
   resolveAmountDecimals,
   resolveApiTokenFilter,
+  transactionTypeMatches,
   matchesFilters,
 };

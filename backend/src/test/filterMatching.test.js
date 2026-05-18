@@ -79,6 +79,28 @@ describe('subscription filter matching', () => {
     ).toBe(true);
   });
 
+  it('transactionType SmartContractResult matches MVX unsigned SCR rows', () => {
+    const marketplace = 'erd1qqqqqqqqqqqqqpgqwp73w2a9eyzs64eltupuz3y3hv798vlv899qrjnflg';
+    const unsignedScr = {
+      type: 'unsigned',
+      function: 'ESDTNFTTransfer',
+      sender: marketplace,
+      originalTxHash: '695a9f5e82f52d19fa7e7a0c155432d3d1e452dea39ea2731962513f89e8c81d',
+      status: 'success',
+      action: { arguments: { transfers: [] } },
+      operations: [{ type: 'nft', collection: 'EMP-897b49', identifier: 'EMP-897b49-1e60' }],
+    };
+    expect(
+      filterMatching.matchesFilters(unsignedScr, {
+        sender: marketplace,
+        function: 'ESDTNFTTransfer',
+        transactionType: 'SmartContractResult',
+        matchTopLevelOnly: true,
+        collectionIdentifier: 'EMP-897b49',
+      })
+    ).toBe(true);
+  });
+
   it('resolveApiTokenFilter maps egldOnly to EGLD and ignores ESDT legacy token', () => {
     expect(filterMatching.resolveApiTokenFilter({ egldOnly: true })).toBe('EGLD');
     expect(filterMatching.resolveApiTokenFilter({ token: 'EGLD' })).toBe('EGLD');
