@@ -5,6 +5,7 @@ const { parseJson } = require('../utils/parseJson');
 const database = require('../config/database');
 const webhookService = require('./webhookService');
 const confirmationPollingService = require('./confirmationPollingService');
+const filterMatching = require('./filterMatching');
 
 const DEDUPE_CACHE_MAX = 2000;
 
@@ -190,11 +191,12 @@ class WebSocketService {
       // The API's function filter is unreliable when combined with address/sender/receiver
       // (e.g. DEX swaps often produce SCRs with function "exchange" not "swap").
       // We omit function from the API payload and filter by function client-side in matchesFilters().
+      const apiToken = this.resolveApiTokenFilter(filters);
       const payload = {
         sender: filters.sender || undefined,
         receiver: filters.receiver || undefined,
         relayer: filters.relayer || undefined,
-        token: filters.token || undefined,
+        token: apiToken,
         address: filters.address || undefined
       };
 
@@ -218,9 +220,15 @@ class WebSocketService {
       }
 
       // API requires at least one filter; we omit function (filtered client-side)
+      if (filters.token && !apiToken) {
+        logger.warn(
+          `Subscription ${subscriptionId}: API token "${filters.token}" is not sent to MultiversX (EGLD-only). Use tokenIdentifier (e.g. REWARD-cf6eac) for ESDT.`
+        );
+      }
+
       if (Object.keys(payload).length === 0) {
         throw new Error(
-          'Function filter must be combined with at least one of: address, sender, receiver, token'
+          'At least one API filter is required: address, sender, receiver, relayer, or EGLD-only'
         );
       }
 
@@ -306,6 +314,9 @@ class WebSocketService {
     return subscriptions.some((s) => {
       const f = parseJson(s.filters);
       if (!f || typeof f !== 'object') return false;
+      if (f.matchTopLevelOnly) {
+        return !!(f.collectionIdentifier || f.tokenIdentifier);
+      }
       return !!(f.function || f.collectionIdentifier || f.tokenIdentifier || f.token);
     });
   }
@@ -491,145 +502,43 @@ class WebSocketService {
   }
 
   normalizeValue(value) {
-    return typeof value === 'string' ? value.trim().toLowerCase() : value;
+    return filterMatching.normalizeValue(value);
   }
 
-  /**
-   * Check if transfer contains the given token (ESDT identifier).
-   * Looks in action.arguments.transfers[] and operations[].
-   */
-  transferHasToken(transfer, targetToken) {
-    const target = this.normalizeValue(targetToken);
-    const fromTransfers = (transfer?.action?.arguments?.transfers || []).some(
-      (t) => this.normalizeValue(t?.token || t?.identifier) === target
-    );
-    const fromOps = (transfer?.operations || []).some(
-      (op) => this.normalizeValue(op?.identifier || op?.tokenIdentifier || op?.token) === target
-    );
-    return fromTransfers || fromOps;
+  resolveApiTokenFilter(filters) {
+    return filterMatching.resolveApiTokenFilter(filters);
   }
 
-  /**
-   * Check if transfer involves NFTs from the given collection.
-   * Collection identifier can be ASCII (e.g. MADC-d03f58) or base64.
-   * Looks in operations[].collection and identifiers that start with collection-.
-   */
-  transferHasCollection(transfer, targetCollection) {
-    const target = this.normalizeValue(targetCollection);
-    const ops = transfer?.operations || [];
-    for (const op of ops) {
-      const col = this.normalizeValue(op?.collection);
-      if (col && col === target) return true;
-      const id = this.normalizeValue(op?.identifier || op?.tokenIdentifier);
-      if (id && (id === target || id.startsWith(target + '-'))) return true;
-    }
-    const transfers = transfer?.action?.arguments?.transfers || [];
-    for (const t of transfers) {
-      const tok = this.normalizeValue(t?.token || t?.identifier);
-      if (tok && (tok === target || tok.startsWith(target + '-'))) return true;
-    }
-    return false;
+  transferHasToken(transfer, targetToken, topLevelOnly = false) {
+    return filterMatching.transferHasToken(transfer, targetToken, topLevelOnly);
   }
 
-  /**
-   * Parse human-readable EGLD amount to BigInt (wei).
-   * Always expects EGLD values: "1000", "0.5", "0.001".
-   * 1 EGLD = 10^18 wei.
-   */
+  transferHasCollection(transfer, targetCollection, topLevelOnly = false) {
+    return filterMatching.transferHasCollection(transfer, targetCollection, topLevelOnly);
+  }
+
   parseAmount(value) {
-    if (value === undefined || value === null || value === '') return null;
-    const s = String(value).trim();
-    if (!s) return null;
-    const E18 = BigInt('1000000000000000000');
-    if (s.includes('.')) {
-      const [intPart, decPart] = s.split('.');
-      const padded = (decPart || '').padEnd(18, '0').slice(0, 18);
-      return BigInt(intPart || '0') * E18 + BigInt(padded);
-    }
-    return BigInt(s) * E18;
+    return filterMatching.parseAmount(value);
   }
 
-  /**
-   * Get the main EGLD value of the transfer (wei).
-   */
   transferValue(transfer) {
-    const v = transfer?.value ?? transfer?.amount;
-    if (v === undefined || v === null) return BigInt(0);
-    return BigInt(String(v));
+    return filterMatching.transferValue(transfer);
   }
 
   transferFunctionName(transfer) {
-    // MultiversX API may expose function at different levels:
-    // - transfer.function (top-level, main tx)
-    // - transfer.action.name (e.g. "transfer", "swap")
-    // - transfer.action.arguments.functionName (SCRs, DEX swaps)
-    return (
-      transfer.function ||
-      transfer.action?.arguments?.functionName ||
-      transfer.action?.name ||
-      transfer.action?.arguments?.function ||
-      null
-    );
+    return filterMatching.transferFunctionName(transfer);
   }
 
-  /**
-   * All normalized function / event names on the transfer (parent + inner SCRs + logs).
-   * Needed when MVX aggregates a purchase: outer `buy` vs inner `ESDTNFTTransfer`.
-   */
   transferFunctionNamesSet(transfer) {
-    const names = new Set();
-    const add = (v) => {
-      const n = this.normalizeValue(v);
-      if (n) names.add(n);
-    };
-    add(this.transferFunctionName(transfer));
-    for (const r of transfer?.results || []) {
-      add(r.function);
-      add(r.action?.name);
-      add(r.action?.arguments?.functionName);
-      add(r.action?.arguments?.function);
-      for (const ev of r?.logs?.events || []) {
-        add(ev.identifier);
-      }
-    }
-    for (const ev of transfer?.logs?.events || []) {
-      add(ev.identifier);
-    }
-    return names;
+    return filterMatching.transferFunctionNamesSet(transfer);
   }
 
-  /** Normalized sender addresses on parent row, inner results, and operations. */
   transferSenderAddressesSet(transfer) {
-    const addrs = new Set();
-    const add = (v) => {
-      const n = this.normalizeValue(v);
-      if (n) addrs.add(n);
-    };
-    add(transfer?.sender);
-    for (const r of transfer?.results || []) {
-      add(r.sender);
-    }
-    for (const op of transfer?.operations || []) {
-      add(op.sender);
-    }
-    return addrs;
+    return filterMatching.transferSenderAddressesSet(transfer);
   }
 
-  /** Normalized receiver addresses on parent row, inner results, and operations. */
   transferReceiverAddressesSet(transfer) {
-    const addrs = new Set();
-    const add = (v) => {
-      const n = this.normalizeValue(v);
-      if (n) addrs.add(n);
-    };
-    add(transfer?.receiver);
-    for (const r of transfer?.results || []) {
-      add(r.receiver);
-    }
-    for (const op of transfer?.operations || []) {
-      add(op.receiver);
-    }
-    return addrs;
+    return filterMatching.transferReceiverAddressesSet(transfer);
   }
 
   shouldProcessTransfer(transfer) {
@@ -641,85 +550,7 @@ class WebSocketService {
   }
 
   matchesFilters(transfer, filters) {
-    const normalizedFilters = filters || {};
-    const sender = this.normalizeValue(transfer.sender);
-    const receiver = this.normalizeValue(transfer.receiver);
-    const relayer = this.normalizeValue(transfer.relayer);
-
-    // Check each filter condition
-    if (normalizedFilters.sender) {
-      const want = this.normalizeValue(normalizedFilters.sender);
-      if (!this.transferSenderAddressesSet(transfer).has(want)) {
-        return false;
-      }
-    }
-
-    if (normalizedFilters.receiver) {
-      const want = this.normalizeValue(normalizedFilters.receiver);
-      if (!this.transferReceiverAddressesSet(transfer).has(want)) {
-        return false;
-      }
-    }
-
-    if (normalizedFilters.function) {
-      const want = this.normalizeValue(normalizedFilters.function);
-      if (!this.transferFunctionNamesSet(transfer).has(want)) {
-        return false;
-      }
-    }
-
-    if (normalizedFilters.token) {
-      const targetToken = this.normalizeValue(normalizedFilters.token);
-      if (!this.transferHasToken(transfer, targetToken)) {
-        return false;
-      }
-    }
-
-    // tokenIdentifier: client-side only, filters by ESDT in action.arguments.transfers
-    if (normalizedFilters.tokenIdentifier) {
-      const targetToken = this.normalizeValue(normalizedFilters.tokenIdentifier);
-      if (!this.transferHasToken(transfer, targetToken)) {
-        return false;
-      }
-    }
-
-    if (normalizedFilters.address) {
-      // Check if address matches sender, receiver, or relayer
-      const normalizedAddress = this.normalizeValue(normalizedFilters.address);
-      const matchesAddress = 
-        sender === normalizedAddress ||
-        receiver === normalizedAddress ||
-        relayer === normalizedAddress;
-      
-      if (!matchesAddress) {
-        return false;
-      }
-    }
-
-    if (normalizedFilters.relayer && relayer !== this.normalizeValue(normalizedFilters.relayer)) {
-      return false;
-    }
-
-    // collectionIdentifier: client-side only, filters by NFT collection in operations
-    if (normalizedFilters.collectionIdentifier) {
-      const target = this.normalizeValue(normalizedFilters.collectionIdentifier);
-      if (!this.transferHasCollection(transfer, target)) {
-        return false;
-      }
-    }
-
-    // amountMin / amountMax: filter by EGLD value (wei)
-    const txValue = this.transferValue(transfer);
-    if (normalizedFilters.amountMin != null) {
-      const minVal = this.parseAmount(normalizedFilters.amountMin);
-      if (minVal != null && txValue < minVal) return false;
-    }
-    if (normalizedFilters.amountMax != null) {
-      const maxVal = this.parseAmount(normalizedFilters.amountMax);
-      if (maxVal != null && txValue > maxVal) return false;
-    }
-
-    return true;
+    return filterMatching.matchesFilters(transfer, filters);
   }
 
   hasDelivered(dedupeKey) {

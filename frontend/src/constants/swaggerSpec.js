@@ -42,11 +42,13 @@ const swaggerSpec = {
         type: 'object',
         additionalProperties: true,
         example: {
-          sender: 'erd1...',
-          receiver: 'erd1...',
-          token: 'EGLD',
+          address: 'erd1...',
+          egldOnly: true,
+          function: 'ESDTNFTTransfer',
+          matchTopLevelOnly: true,
+          transactionType: 'SmartContractResult',
           tokenIdentifier: 'REWARD-cf6eac',
-          function: 'swap'
+          collectionIdentifier: 'EMP-897b49'
         }
       },
       Subscription: {

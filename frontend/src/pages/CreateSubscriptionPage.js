@@ -40,10 +40,12 @@ export default function CreateSubscriptionPage() {
     filters: {
       sender: '',
       receiver: '',
-      function: '',
-      token: '',
-      tokenIdentifier: '',
       address: '',
+      egldOnly: false,
+      function: '',
+      matchTopLevelOnly: false,
+      transactionType: '',
+      tokenIdentifier: '',
       collectionIdentifier: '',
       amountMin: '',
       amountMax: '',
@@ -99,10 +101,12 @@ export default function CreateSubscriptionPage() {
             filters: {
               sender: f.sender || '',
               receiver: f.receiver || '',
-              function: f.function || '',
-              token: f.token || '',
-              tokenIdentifier: f.tokenIdentifier || '',
               address: f.address || '',
+              egldOnly: !!(f.egldOnly || f.token === 'EGLD' || f.token === 'EGLD-000000'),
+              function: f.function || '',
+              matchTopLevelOnly: !!f.matchTopLevelOnly,
+              transactionType: f.transactionType || '',
+              tokenIdentifier: f.tokenIdentifier || '',
               collectionIdentifier: f.collectionIdentifier || '',
               amountMin: f.amountMin ?? '',
               amountMax: f.amountMax ?? '',
@@ -119,10 +123,12 @@ export default function CreateSubscriptionPage() {
     const f = {};
     if (form.filters.sender) f.sender = form.filters.sender;
     if (form.filters.receiver) f.receiver = form.filters.receiver;
-    if (form.filters.function) f.function = form.filters.function;
-    if (form.filters.token) f.token = form.filters.token;
-    if (form.filters.tokenIdentifier) f.tokenIdentifier = form.filters.tokenIdentifier;
     if (form.filters.address) f.address = form.filters.address;
+    if (form.filters.egldOnly) f.egldOnly = true;
+    if (form.filters.function) f.function = form.filters.function;
+    if (form.filters.matchTopLevelOnly) f.matchTopLevelOnly = true;
+    if (form.filters.transactionType) f.transactionType = form.filters.transactionType;
+    if (form.filters.tokenIdentifier) f.tokenIdentifier = form.filters.tokenIdentifier;
     if (form.filters.collectionIdentifier) f.collectionIdentifier = form.filters.collectionIdentifier;
     if (form.filters.amountMin !== '') f.amountMin = form.filters.amountMin;
     if (form.filters.amountMax !== '') f.amountMax = form.filters.amountMax;
@@ -135,7 +141,9 @@ export default function CreateSubscriptionPage() {
     setError('');
     const filters = buildFilters();
     if (Object.keys(filters).length === 0) {
-      setError('At least one filter is required (sender, receiver, function, token, tokenIdentifier, or address)');
+      setError(
+        'At least one filter is required (sender, receiver, address, function, token identifier, collection, EGLD-only, or amount).'
+      );
       return;
     }
     if (!form.name || !form.webhook_url) {
@@ -248,6 +256,9 @@ export default function CreateSubscriptionPage() {
                 <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
                   API filters (sent to MultiversX WebSocket)
                 </Typography>
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Narrow what the chain streams before client-side filters run. ESDT and NFT rules belong in the section below.
+                </Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
@@ -255,7 +266,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.sender}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, sender: e.target.value } })}
                   placeholder="erd1..."
-                  helperText="For smart contracts (marketplaces, routers), prefer Address below: user txs usually list the wallet as sender."
+                  helperText="Account that signed the transaction. For marketplaces, prefer Address so user buy calls are included (buy lists the wallet as sender, contract as receiver)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -264,15 +275,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.receiver}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, receiver: e.target.value } })}
                   placeholder="erd1..."
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Token"
-                  value={form.filters.token}
-                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, token: e.target.value } })}
-                  placeholder="EGLD or USDC-c76f1f"
-                  helperText="EGLD or ESDT (e.g. USDC-c76f1f)."
+                  helperText="Destination account on the WebSocket row. Pair with Function for contract calls (e.g. marketplace receiver + buy)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -280,9 +283,25 @@ export default function CreateSubscriptionPage() {
                   label="Address"
                   value={form.filters.address}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, address: e.target.value } })}
-                  placeholder="erd1..."
-                  helperText="Matches sender OR receiver OR relayer."
+                  placeholder="erd1qqqq... (OOX marketplace)"
+                  helperText="Matches sender OR receiver OR relayer on the streamed row. Best for smart contracts (e.g. OOX marketplace erd1…jnflg)."
                 />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!form.filters.egldOnly}
+                      onChange={(e) =>
+                        setForm({ ...form, filters: { ...form.filters, egldOnly: e.target.checked } })
+                      }
+                    />
+                  }
+                  label="EGLD transfers only (API)"
+                />
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5, ml: 4.5 }}>
+                  ON: MultiversX filters native EGLD legs only. OFF: no token filter at API level. ESDT (e.g. REWARD-cf6eac) — use Token identifier below; USDC-style API token filters are unreliable.
+                </Typography>
               </Grid>
 
               <Grid item xs={12}>
@@ -290,32 +309,76 @@ export default function CreateSubscriptionPage() {
                 <Typography variant="overline" color="text.secondary" sx={{ display: 'block' }}>
                   Client-side filters (applied after WebSocket)
                 </Typography>
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                  Applied per WebSocket row. One logical action (e.g. marketplace buy) can produce multiple rows (buy + SmartContractResult).
+                </Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Function"
                   value={form.filters.function}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, function: e.target.value } })}
-                  placeholder="swap, buy, ESDTTransfer"
-                  helperText="Smart contract function (e.g. swap, buy)."
+                  placeholder="ESDTNFTTransfer, buy, ESDTTransfer"
+                  helperText="Endpoint or event name on this row (e.g. ESDTNFTTransfer for NFT delivery, buy for marketplace purchase)."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Transaction type</InputLabel>
+                  <Select
+                    value={form.filters.transactionType}
+                    label="Transaction type"
+                    onChange={(e) =>
+                      setForm({ ...form, filters: { ...form.filters, transactionType: e.target.value } })
+                    }
+                  >
+                    <MenuItem value="">Any</MenuItem>
+                    <MenuItem value="normal">normal (user / contract call)</MenuItem>
+                    <MenuItem value="SmartContractResult">SmartContractResult (inner result tx)</MenuItem>
+                  </Select>
+                  <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                    Use SmartContractResult with Function ESDTNFTTransfer to receive SCR-only webhooks, not the parent buy tx.
+                  </Typography>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={!!form.filters.matchTopLevelOnly}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          filters: { ...form.filters, matchTopLevelOnly: e.target.checked },
+                        })
+                      }
+                    />
+                  }
+                  label="Match top-level fields only"
+                />
+                <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5, ml: 4.5 }}>
+                  ON: Function, sender, receiver, token, and collection must match this row only — not nested results/operations/logs.
+                  Example: Function ESDTNFTTransfer + ON avoids matching a parent buy that contains ESDTNFTTransfer inside.
+                </Typography>
+              </Grid>
+              <Grid item xs={12} md={6}>
                 <TextField
-                  label="Token identifier"
+                  label="Token identifier (ESDT)"
                   value={form.filters.tokenIdentifier}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, tokenIdentifier: e.target.value } })}
                   placeholder="REWARD-cf6eac"
-                  helperText="ESDT in action.arguments.transfers (e.g. REWARD-cf6eac)."
+                  helperText="Fungible ESDT on this row (e.g. farm reward REWARD-cf6eac). Not for EGLD — use EGLD transfers only (API) or amount min/max."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
-                  label="Collection identifier"
+                  label="Collection identifier (NFT)"
                   value={form.filters.collectionIdentifier}
-                  onChange={(e) => setForm({ ...form, filters: { ...form.filters, collectionIdentifier: e.target.value } })}
-                  placeholder="MADC-d03f58"
-                  helperText="NFT collection (e.g. MADC-d03f58)."
+                  onChange={(e) =>
+                    setForm({ ...form, filters: { ...form.filters, collectionIdentifier: e.target.value } })
+                  }
+                  placeholder="EMP-897b49"
+                  helperText="NFT collection on this row (e.g. Empyreans EMP-897b49). Matches identifiers like EMP-897b49-3c."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -323,8 +386,8 @@ export default function CreateSubscriptionPage() {
                   label="Amount min (EGLD)"
                   value={form.filters.amountMin}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMin: e.target.value } })}
-                  placeholder="1000"
-                  helperText="Min EGLD (e.g. 1000 for whale moves)."
+                  placeholder="0.35"
+                  helperText="Minimum native EGLD value on this row (value field, in EGLD). Example: 0.35 for a 0.35 EGLD buy. ESDT amounts (REWARD-cf6eac) — use Token identifier, not this field."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -332,8 +395,8 @@ export default function CreateSubscriptionPage() {
                   label="Amount max (EGLD)"
                   value={form.filters.amountMax}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, amountMax: e.target.value } })}
-                  placeholder=""
-                  helperText="Max EGLD (e.g. 5000)."
+                  placeholder="5"
+                  helperText="Maximum native EGLD value on this row. ESDT rewards/tokens are not filtered by amount here."
                 />
               </Grid>
 
