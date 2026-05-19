@@ -36,7 +36,7 @@ function scheduleConfirmationCheck(transfer, subscriptions, network = 'mainnet',
     return;
   }
 
-  logger.info(`Scheduling confirmation poll for ${txHash} in ${POLL_DELAY_MS}ms`);
+  logger.debug(`Scheduling confirmation poll for ${txHash} in ${POLL_DELAY_MS}ms`);
 
   setTimeout(async () => {
     await pollUntilConfirmed(txHash, transfer, subscriptions, network, wsService);
@@ -64,11 +64,11 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
         const dedupeKey = `${deliveredTxHash}|${txStatus}`;
         const claimed = await database.tryClaimDelivered(dedupeKey);
         if (!claimed) {
-          logger.info(`Confirmation poll: tx ${txHash} status=${txStatus} already delivered (DB dedupe), skipping`);
+          logger.debug(`Confirmation poll: tx ${txHash} status=${txStatus} already delivered (DB dedupe), skipping`);
           return;
         }
 
-        logger.info(`Confirmation poll: tx ${txHash} final status=${txStatus} (attempt ${attempt})`);
+        logger.info(`[subscription] confirmation poll tx ${txHash} final status=${txStatus} (attempt ${attempt})`);
         wsService.recordDelivered(dedupeKey);
 
         const confirmedTransfer = {

@@ -40,7 +40,7 @@ async function fetchTokenDecimals(tokenIdentifier, network = 'mainnet') {
     const decimals = response.data?.decimals;
     if (isValidDecimals(decimals)) {
       decimalsCache.set(key, decimals);
-      logger.info(`Token ${id} on ${network}: decimals=${decimals}`);
+      logger.debug(`Token ${id} on ${network}: decimals=${decimals}`);
       return decimals;
     }
     logger.warn(`Token ${id}: unexpected decimals=${decimals}, defaulting to 18`);
@@ -100,7 +100,7 @@ async function hydrateSubscriptionFilters(subscriptions, network = 'mainnet') {
 
       if (tokenDecimals === undefined) {
         tokenDecimals = await fetchTokenDecimals(tokenId, network);
-        logger.info(
+        logger.debug(
           `Subscription ${sub.id}: resolved ${tokenId} decimals=${tokenDecimals} for amount filters`
         );
       } else {

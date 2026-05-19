@@ -10,11 +10,16 @@ const { hydrateSubscriptionFilters } = require('./tokenMetadata');
 
 const DEDUPE_CACHE_MAX = 2000;
 
-/** Set LOG_LEVEL=debug to include nested tx diagnostics when no subscription matches. */
+/** Set LOG_LEVEL=debug or TRANSFER_LOG_VERBOSE=1 for per-transfer and no-match dumps. */
 const FILTER_DEBUG =
   process.env.LOG_LEVEL === 'debug' ||
   process.env.WEBSOCKET_FILTER_DEBUG === 'true' ||
   process.env.WEBSOCKET_FILTER_DEBUG === '1';
+
+const VERBOSE_TRANSFERS =
+  FILTER_DEBUG ||
+  process.env.TRANSFER_LOG_VERBOSE === 'true' ||
+  process.env.TRANSFER_LOG_VERBOSE === '1';
 
 /** When true, skip REST GET /transactions/:hash to enrich thin WS payloads (not recommended). */
 const ENRICH_DISABLED =
@@ -359,7 +364,7 @@ class WebSocketService {
     if (!apiTx) return transfer;
 
     const enriched = this.mergeApiTxIntoTransfer(transfer, apiTx);
-    logger.info(
+    logger.debug(
       `Transfer ${txId}: pre-enriched for matching (operations=${enriched?.operations?.length || 0}, type=${enriched?.type})`
     );
     return enriched;
@@ -392,11 +397,15 @@ class WebSocketService {
       matchedSubs.push(subscription);
       const status = (transfer?.status || '').toLowerCase();
       if (filters.onlyConfirmed && status === 'pending') {
-        logger.info(`Transfer ${txId} matched subscription ${subscription.id} (onlyConfirmed: skipping pending)`);
+        logger.debug(
+          `Transfer ${txId} matched subscription ${subscription.id} (${subscription.name}, onlyConfirmed: skip pending)`
+        );
         continue;
       }
 
-      logger.info(`Transfer ${txId} matched subscription ${subscription.id} (${subscription.name})`);
+      logger.info(
+        `[subscription] ${subscription.name} (id=${subscription.id}) ← tx ${txId} function=${this.transferFunctionName(transfer)} status=${status}`
+      );
       subscriptionsToDeliver.push(subscription);
     }
     return { matchedSubs, subscriptionsToDeliver };
@@ -417,7 +426,9 @@ class WebSocketService {
 
       const subscriptions = await hydrateSubscriptionFilters(subscriptionsRaw, network);
 
-      logger.info(`Received ${data.transfers.length} transfer(s) from ${network}, ${subscriptions.length} active subscription(s)`);
+      logger.debug(
+        `Received ${data.transfers.length} transfer(s) from ${network}, ${subscriptions.length} active subscription(s)`
+      );
 
       if (subscriptions.length === 0) {
         return;
@@ -426,12 +437,14 @@ class WebSocketService {
       for (const transfer of data.transfers) {
         const txId = transfer?.txHash || transfer?.hash || 'unknown';
         const fn = this.transferFunctionName(transfer);
-        logger.info(
-          `Transfer: txHash=${txId} sender=${transfer?.sender} receiver=${transfer?.receiver} function=${fn} status=${transfer?.status} type=${transfer?.type}`
-        );
+        if (VERBOSE_TRANSFERS) {
+          logger.info(
+            `Transfer: txHash=${txId} sender=${transfer?.sender} receiver=${transfer?.receiver} function=${fn} status=${transfer?.status} type=${transfer?.type}`
+          );
+        }
 
         if (!this.shouldProcessTransfer(transfer)) {
-          logger.info(
+          logger.debug(
             `Skipping non-success transfer ${txId} (status=${transfer?.status || 'unknown'})`
           );
           continue;
@@ -439,7 +452,7 @@ class WebSocketService {
 
         const dedupeKey = `${txId}|${transfer?.status ?? ''}`;
         if (this.deliveredKeys.has(dedupeKey)) {
-          logger.info(
+          logger.debug(
             `Skipping duplicate transfer ${txId} status=${transfer?.status} (webhook already delivered, in-memory)`
           );
           continue;
@@ -456,9 +469,9 @@ class WebSocketService {
         const hasWork = subscriptionsToDeliver.length > 0 || schedulePoll;
 
         if (!hasWork) {
-          if (matchedSubs.length === 0 && subscriptions.length > 0) {
+          if (VERBOSE_TRANSFERS && matchedSubs.length === 0 && subscriptions.length > 0) {
             const deepFns = [...this.transferFunctionNamesSet(processedTransfer)].join(',');
-            logger.info(
+            logger.debug(
               `Transfer ${txId} did not match any subscription (receiver=${processedTransfer?.receiver}, topFunction=${fn}, deepFunctions=[${deepFns}])`
             );
             if (FILTER_DEBUG) {
@@ -470,7 +483,7 @@ class WebSocketService {
             }
             subscriptions.forEach((s) => {
               const f = parseJson(s.filters);
-              logger.info(
+              logger.debug(
                 `  Sub ${s.id} (${s.name}): receiver=${f?.receiver || '(any)'}, function=${f?.function || '(any)'}, transactionType=${f?.transactionType || '(any)'}, matchTopLevelOnly=${f?.matchTopLevelOnly ? 'yes' : 'no'}, tokenIdentifier=${f?.tokenIdentifier || '(any)'}, collectionIdentifier=${f?.collectionIdentifier || '(any)'}, sender=${f?.sender || '(any)'}, address=${f?.address || '(any)'}, amountMin=${f?.amountMin ?? '(any)'}, amountMax=${f?.amountMax ?? '(any)'}`
               );
             });
@@ -480,7 +493,7 @@ class WebSocketService {
 
         const claimed = await database.tryClaimDelivered(dedupeKey);
         if (!claimed) {
-          logger.info(
+          logger.debug(
             `Skipping duplicate transfer ${txId} status=${transfer?.status} (another instance owns dedupe for delivery/poll)`
           );
           this.deliveredKeys.add(dedupeKey);

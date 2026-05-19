@@ -319,7 +319,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.function}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, function: e.target.value } })}
                   placeholder="ESDTNFTTransfer, buy, ESDTTransfer"
-                  helperText="Endpoint or event name on this row (e.g. ESDTNFTTransfer for NFT delivery, buy for marketplace purchase)."
+                  helperText="Function on this WebSocket row. OOX buys: ESDTNFTTransfer. OOX list/auction SCRs: auctionToken (not ESDTNFTTransfer). XOXNO listings: listing."
                 />
               </Grid>
               <Grid item xs={12} md={6}>

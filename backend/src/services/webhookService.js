@@ -20,7 +20,7 @@ class WebhookService {
       attempt++;
       
       try {
-        logger.info(`Delivering webhook for subscription ${subscription.id}, attempt ${attempt}`);
+        logger.debug(`Delivering webhook for subscription ${subscription.id}, attempt ${attempt}`);
 
         const status = (transferData?.status || '').toLowerCase();
         const isConfirmed = status === 'success';
@@ -51,7 +51,9 @@ class WebhookService {
         success = response.status >= 200 && response.status < 300;
 
         if (success) {
-          logger.info(`Webhook delivered successfully for subscription ${subscription.id}, status: ${statusCode}`);
+          logger.info(
+            `[webhook] delivered → ${subscription.name} (id=${subscription.id}) HTTP ${statusCode} tx=${transferData?.txHash || transferData?.hash || 'n/a'}`
+          );
         } else {
           logger.warn(`Webhook delivery failed for subscription ${subscription.id}, status: ${statusCode}`);
           errorMessage = `HTTP ${statusCode}`;
