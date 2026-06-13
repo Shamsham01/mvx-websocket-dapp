@@ -14,6 +14,9 @@ export const APP_LOGOS = {
   ASSETS_MANAGER: 'https://i.ibb.co/prykbvwP/Assets-Manager.png',
   WARPS: 'https://i.ibb.co/NgfrGqmr/Warps.png',
   MULTIVERSX_SWAP: 'https://i.ibb.co/bjVKxw0T/Multivers-X-Swap.png',
+  MULTIVERSX_API: 'https://i.ibb.co/ymtxf276/Multivers-X-API.png',
+  MULTIVERSX_DATA_API: 'https://i.ibb.co/rKmRPT0q/Multivers-X-Data-API.png',
+  TWITTER_X: 'https://i.ibb.co/QjcstXzh/Twitter-X.png',
 };
 
 /** Replace '#' with actual Make.com installation URLs when available. */
@@ -24,6 +27,12 @@ export const INSTALL_URLS = {
   WARPS: 'https://www.make.com/en/hq/app-invitation/113f288efa442e5a2529b09e3dbe4339',
   MULTIVERSX_SWAP:
     'https://www.make.com/en/hq/app-invitation/3a507f832c08750761281c87e3b2055a',
+  MULTIVERSX_API:
+    'https://www.make.com/en/hq/app-invitation/e48c7c54ba4729fafb838c8ad0f73f42',
+  MULTIVERSX_DATA_API:
+    'https://www.make.com/en/hq/app-invitation/84a44cd1151eb984830c085b0cff0a97',
+  TWITTER_X:
+    'https://www.make.com/en/hq/app-invitation/7849f4c3b4fcc0de5b6322e482d16e18',
 };
 
 export const COMMUNITY = {
@@ -37,5 +46,7 @@ export const DOCS = {
   LITEPAPER: 'https://hodltokenclub.gitbook.io/hodl-token-club-litepaper-v2',
   MAKE_AI_AGENTS: 'https://www.make.com/en/ai-agents',
   MVX_WEBSITE: 'https://multiversx.com/',
+  MVX_PUBLIC_API: 'https://api.multiversx.com/',
+  MVX_DATA_API: 'https://data-api.multiversx.com/',
   MAKEX_DOCS: 'https://hodltokenclub.gitbook.io/makex_web3',
 };

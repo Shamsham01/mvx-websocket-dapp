@@ -73,6 +73,47 @@ const apps = [
       'DeFi strategy automation',
     ],
   },
+  {
+    name: 'MultiversX API',
+    logo: APP_LOGOS.MULTIVERSX_API,
+    purpose:
+      'Use 171 MultiversX REST endpoints inside Make.com \u2014 a no-code wrapper around api.multiversx.com.',
+    users: 'Developers, analysts, automation builders',
+    alwaysFree: true,
+    capabilities: [
+      '171 REST endpoints',
+      'Accounts & transactions',
+      'Tokens, NFTs & network data',
+      'Always free to use',
+    ],
+  },
+  {
+    name: 'MultiversX Data API',
+    logo: APP_LOGOS.MULTIVERSX_DATA_API,
+    purpose:
+      'Query indexed MultiversX blockchain data in Make.com \u2014 mirrors data-api.multiversx.com.',
+    users: 'Analysts, dashboards, reporting flows',
+    alwaysFree: true,
+    capabilities: [
+      '3 indexed data endpoints',
+      'Simplified API access',
+      'Reporting & dashboards',
+      'Always free to use',
+    ],
+  },
+  {
+    name: 'Twitter / X',
+    logo: APP_LOGOS.TWITTER_X,
+    purpose: 'Automate X (Twitter) workflows inside Make.com alongside your on-chain ops.',
+    users: 'Marketing teams, community managers',
+    usageFee: true,
+    capabilities: [
+      'Social automation',
+      'Community engagement',
+      'X platform integration',
+      'Usage fee required',
+    ],
+  },
 ];
 
 export default function AppsToolkitSection() {
@@ -87,8 +128,8 @@ export default function AppsToolkitSection() {
           color="text.secondary"
           sx={{ mb: 5, textAlign: 'center', maxWidth: 600, mx: 'auto' }}
         >
-          Five purpose-built Make.com modules that cover the full spectrum of
-          on-chain operations.
+          Eight purpose-built Make.com modules that cover on-chain operations,
+          public API access, and social automation.
         </Typography>
 
         <Grid container spacing={2.5}>
@@ -113,9 +154,27 @@ export default function AppsToolkitSection() {
                       sx={{ width: 52, height: 52 }}
                     />
                     <Box>
-                      <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
-                        {app.name}
-                      </Typography>
+                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+                          {app.name}
+                        </Typography>
+                        {app.alwaysFree ? (
+                          <Chip
+                            label="Always free"
+                            size="small"
+                            color="success"
+                            sx={{ fontSize: '0.65rem', height: 20 }}
+                          />
+                        ) : null}
+                        {app.usageFee ? (
+                          <Chip
+                            label="Usage fee"
+                            size="small"
+                            variant="outlined"
+                            sx={{ fontSize: '0.65rem', height: 20 }}
+                          />
+                        ) : null}
+                      </Stack>
                       <Typography variant="caption" color="text.secondary">
                         {app.users}
                       </Typography>

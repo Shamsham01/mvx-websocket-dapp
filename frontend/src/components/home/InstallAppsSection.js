@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Stack,
   Table,
@@ -53,7 +54,78 @@ const apps = [
     purpose: 'Automated token swaps using AshSwap Aggregator',
     installUrl: INSTALL_URLS.MULTIVERSX_SWAP,
   },
+  {
+    name: 'MultiversX API',
+    logo: APP_LOGOS.MULTIVERSX_API,
+    purpose: '171 MultiversX REST endpoints in Make.com (api.multiversx.com)',
+    installUrl: INSTALL_URLS.MULTIVERSX_API,
+    alwaysFree: true,
+  },
+  {
+    name: 'MultiversX Data API',
+    logo: APP_LOGOS.MULTIVERSX_DATA_API,
+    purpose: 'Indexed blockchain data in Make.com (data-api.multiversx.com)',
+    installUrl: INSTALL_URLS.MULTIVERSX_DATA_API,
+    alwaysFree: true,
+  },
+  {
+    name: 'Twitter / X',
+    logo: APP_LOGOS.TWITTER_X,
+    purpose: 'Automate X workflows — usage fee required (same as Transfers & Snapshots)',
+    installUrl: INSTALL_URLS.TWITTER_X,
+    usageFee: true,
+  },
 ];
+
+function AppNameCell({ app }) {
+  return (
+    <Stack direction="row" spacing={1.5} alignItems="center">
+      <Avatar
+        src={app.logo}
+        alt={app.name}
+        variant="rounded"
+        sx={APP_LOGO_AVATAR_SX}
+      />
+      <Stack spacing={0.5}>
+        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {app.name}
+          </Typography>
+          {app.alwaysFree ? (
+            <Chip label="Always free" size="small" color="success" sx={{ fontSize: '0.65rem', height: 20 }} />
+          ) : null}
+          {app.usageFee ? (
+            <Chip label="Usage fee" size="small" variant="outlined" sx={{ fontSize: '0.65rem', height: 20 }} />
+          ) : null}
+        </Stack>
+      </Stack>
+    </Stack>
+  );
+}
+
+function InstallButton({ app, fullWidth = false }) {
+  if (!app.installUrl) {
+    return (
+      <Button variant="outlined" size="small" disabled fullWidth={fullWidth}>
+        Coming soon
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      variant="outlined"
+      size="small"
+      endIcon={<OpenInNewRoundedIcon />}
+      href={app.installUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      fullWidth={fullWidth}
+    >
+      Install
+    </Button>
+  );
+}
 
 export default function InstallAppsSection() {
   const theme = useTheme();
@@ -87,17 +159,7 @@ export default function InstallAppsSection() {
                 {apps.map((app) => (
                   <TableRow key={app.name}>
                     <TableCell>
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Avatar
-                          src={app.logo}
-                          alt={app.name}
-                          variant="rounded"
-                          sx={APP_LOGO_AVATAR_SX}
-                        />
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {app.name}
-                        </Typography>
-                      </Stack>
+                      <AppNameCell app={app} />
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
@@ -105,16 +167,7 @@ export default function InstallAppsSection() {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        endIcon={<OpenInNewRoundedIcon />}
-                        href={app.installUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        Install
-                      </Button>
+                      <InstallButton app={app} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -126,31 +179,13 @@ export default function InstallAppsSection() {
             {apps.map((app) => (
               <Card key={app.name}>
                 <CardContent sx={{ p: 2.5 }}>
-                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
-                    <Avatar
-                      src={app.logo}
-                      alt={app.name}
-                      variant="rounded"
-                      sx={APP_LOGO_AVATAR_SX}
-                    />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {app.name}
-                    </Typography>
-                  </Stack>
+                  <Box sx={{ mb: 1.5 }}>
+                    <AppNameCell app={app} />
+                  </Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                     {app.purpose}
                   </Typography>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    endIcon={<OpenInNewRoundedIcon />}
-                    href={app.installUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    fullWidth
-                  >
-                    Install
-                  </Button>
+                  <InstallButton app={app} fullWidth />
                 </CardContent>
               </Card>
             ))}
