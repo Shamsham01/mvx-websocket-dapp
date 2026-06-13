@@ -18,6 +18,7 @@ const apps = [
     logo: APP_LOGOS.TRANSFERS,
     purpose: 'Send EGLD, ESDTs, stablecoins, NFTs, and SFTs\u00A0\u2014 individually or in bulk.',
     users: 'Projects, DAOs, payroll teams',
+    usageFee: true,
     capabilities: [
       'Single & multi-recipient transfers',
       'Stablecoin payouts & payroll',
@@ -30,6 +31,7 @@ const apps = [
     logo: APP_LOGOS.SNAPSHOT_DRAW,
     purpose: 'Snapshot token holders (including staked) and run verifiable draws.',
     users: 'Communities, marketing teams, DAOs',
+    usageFee: true,
     capabilities: [
       'Point-in-time holder snapshots',
       'Staking-aware balances',
@@ -42,6 +44,7 @@ const apps = [
     logo: APP_LOGOS.ASSETS_MANAGER,
     purpose: 'Issue, mint, burn, and manage ESDT token lifecycle operations.',
     users: 'Token issuers, project teams',
+    usageFee: true,
     capabilities: [
       'Issue new tokens',
       'Mint & burn supply',
@@ -54,6 +57,7 @@ const apps = [
     logo: APP_LOGOS.WARPS,
     purpose: 'Query and execute any smart contract endpoint visually, no code required.',
     users: 'Non-devs, DAOs, ops teams',
+    usageFee: true,
     capabilities: [
       'Visual SC endpoint execution',
       'Query contract state',
@@ -66,6 +70,7 @@ const apps = [
     logo: APP_LOGOS.MULTIVERSX_SWAP,
     purpose: 'Automated token swaps using AshSwap Aggregator',
     users: 'Traders, treasury managers, DeFi teams',
+    usageFee: true,
     capabilities: [
       'Automated swap triggers',
       'AshSwap Aggregator routing',
