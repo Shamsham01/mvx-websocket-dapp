@@ -60,25 +60,26 @@ const apps = [
     usageFee: true,
   },
   {
+    name: 'Twitter / X',
+    logo: APP_LOGOS.TWITTER_X,
+    purpose:
+      'Create X posts with images and video, and search or retrieve posts and accounts.',
+    installUrl: INSTALL_URLS.TWITTER_X,
+    usageFee: true,
+  },
+  {
     name: 'MultiversX API',
     logo: APP_LOGOS.MULTIVERSX_API,
-    purpose: '171 MultiversX REST endpoints in Make.com (api.multiversx.com)',
+    purpose: 'Build MultiversX apps and integrations with ease — 171 endpoints available.',
     installUrl: INSTALL_URLS.MULTIVERSX_API,
     alwaysFree: true,
   },
   {
     name: 'MultiversX Data API',
     logo: APP_LOGOS.MULTIVERSX_DATA_API,
-    purpose: 'Indexed blockchain data in Make.com (data-api.multiversx.com)',
+    purpose: 'Current and historical token prices plus on-chain token data for your workflows.',
     installUrl: INSTALL_URLS.MULTIVERSX_DATA_API,
     alwaysFree: true,
-  },
-  {
-    name: 'Twitter / X',
-    logo: APP_LOGOS.TWITTER_X,
-    purpose: 'Automate X workflows — usage fee required (same as Transfers & Snapshots)',
-    installUrl: INSTALL_URLS.TWITTER_X,
-    usageFee: true,
   },
 ];
 

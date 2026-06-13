@@ -79,16 +79,30 @@ const apps = [
     ],
   },
   {
+    name: 'Twitter / X',
+    logo: APP_LOGOS.TWITTER_X,
+    purpose:
+      'Create X posts with images and video, and search or retrieve posts and accounts — all from Make.com.',
+    users: 'Marketing teams, community managers',
+    usageFee: true,
+    capabilities: [
+      'Posts with images & video',
+      'Search posts & accounts',
+      'Social automation',
+      'Usage fee required',
+    ],
+  },
+  {
     name: 'MultiversX API',
     logo: APP_LOGOS.MULTIVERSX_API,
     purpose:
-      'Use 171 MultiversX REST endpoints inside Make.com \u2014 a no-code wrapper around api.multiversx.com.',
+      'Build MultiversX apps and integrations with ease — 171 REST endpoints, no custom code required.',
     users: 'Developers, analysts, automation builders',
     alwaysFree: true,
     capabilities: [
       '171 REST endpoints',
-      'Accounts & transactions',
-      'Tokens, NFTs & network data',
+      'Apps & integrations',
+      'Accounts, tokens & network data',
       'Always free to use',
     ],
   },
@@ -96,27 +110,14 @@ const apps = [
     name: 'MultiversX Data API',
     logo: APP_LOGOS.MULTIVERSX_DATA_API,
     purpose:
-      'Query indexed MultiversX blockchain data in Make.com \u2014 mirrors data-api.multiversx.com.',
+      'Access current and historical token prices plus rich on-chain token data for dashboards and automations.',
     users: 'Analysts, dashboards, reporting flows',
     alwaysFree: true,
     capabilities: [
-      '3 indexed data endpoints',
-      'Simplified API access',
+      'Live & historical prices',
+      'Token & market data',
       'Reporting & dashboards',
       'Always free to use',
-    ],
-  },
-  {
-    name: 'Twitter / X',
-    logo: APP_LOGOS.TWITTER_X,
-    purpose: 'Automate X (Twitter) workflows inside Make.com alongside your on-chain ops.',
-    users: 'Marketing teams, community managers',
-    usageFee: true,
-    capabilities: [
-      'Social automation',
-      'Community engagement',
-      'X platform integration',
-      'Usage fee required',
     ],
   },
 ];
