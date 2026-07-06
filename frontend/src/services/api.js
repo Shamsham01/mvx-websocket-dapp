@@ -106,4 +106,9 @@ export const templateAPI = {
   delete: (id) => api.delete(`/templates/${encodeURIComponent(id)}`),
 };
 
+export const billingAPI = {
+  getPrefs: () => api.get('/billing-prefs'),
+  savePrefs: (feeToken) => api.put('/billing-prefs', { feeToken }),
+};
+
 export default api;

@@ -41,7 +41,8 @@ import SectionCard from '../components/ui/SectionCard';
 import StatCard from '../components/ui/StatCard';
 import ErrorState from '../components/ui/ErrorState';
 import { fetchRewardTokenDenominated, fetchUsageFeeTransfersPage } from '../services/mvxPublicApi';
-import { MAKEX_USAGE_FEE_ADDRESS, REWARD_TOKEN_ID } from '../constants/mvx';
+import { MAKEX_USAGE_FEE_ADDRESS, REWARD_TOKEN_ID, USDC_TOKEN_ID } from '../constants/mvx';
+import BillingPreferencesCard from '../components/dashboard/BillingPreferencesCard';
 import {
   aggregateByDay,
   buildChartRows,
@@ -196,7 +197,7 @@ export default function DashboardPage() {
     <Box>
       <PageHeader
         title="Dashboard"
-        description="Track MakeX usage fees paid in REWARD to the protocol treasury—pulled live from MultiversX."
+        description="Track MakeX usage fees paid to the protocol treasury—USDC and REWARD, pulled live from MultiversX."
         actions={
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -240,6 +241,10 @@ export default function DashboardPage() {
         </Typography>
         ). Historical fiat value may differ from spot rates at each transaction.
       </Typography>
+
+      <Box sx={{ mb: 2 }}>
+        <BillingPreferencesCard walletAddress={user.address} />
+      </Box>
 
       {loadError && (
         <Box sx={{ mb: 2 }}>

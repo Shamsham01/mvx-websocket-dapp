@@ -13,6 +13,7 @@ const authRoutes = require('./routes/auth');
 const subscriptionRoutes = require('./routes/subscriptions');
 const webhookRoutes = require('./routes/webhooks');
 const templateRoutes = require('./routes/templates');
+const billingPrefsRoutes = require('./routes/billingPrefs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -31,6 +32,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/billing-prefs', billingPrefsRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

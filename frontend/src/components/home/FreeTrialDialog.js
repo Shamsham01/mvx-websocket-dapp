@@ -144,7 +144,7 @@ export default function FreeTrialDialog({ open, onClose }) {
               {formatDate(endDate)}
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              All MakeX apps are now fee-free for your wallet.
+              Standard MakeX apps are fee-free for your wallet. Twitter/X premium ($0.05 USDC) is always charged and is not included in the free trial.
             </Typography>
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>

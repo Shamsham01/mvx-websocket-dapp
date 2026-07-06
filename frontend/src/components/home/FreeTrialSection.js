@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Button, Card, CardContent, Container, Typography } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { useAuth } from '../../context/AuthContext';
-import { MAKEX_FREE_TRIAL_DAYS } from '../../constants/mvx';
+import { MAKEX_FREE_TRIAL_DAYS, STANDARD_REWARD_FEE_USD, STANDARD_USDC_FEE_USD, TWITTER_PREMIUM_USDC_FEE_USD } from '../../constants/mvx';
 import { openWalletConnect } from '../../utils/walletConnect';
 
 export default function FreeTrialSection({ onOpenTrial }) {
@@ -36,14 +36,13 @@ export default function FreeTrialSection({ onOpenTrial }) {
         >
           <CardContent sx={{ p: { xs: 3, md: 4 } }}>
             <Typography variant="h3" sx={{ mb: 1.5 }}>
-              Free Trial + $REWARD
+              Free Trial + Flexible Billing
             </Typography>
             <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
-              {MAKEX_FREE_TRIAL_DAYS} days fee-free to test every MakeX app.
+              {MAKEX_FREE_TRIAL_DAYS} days fee-free on standard MakeX apps.
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              After the trial, operations are powered by $REWARD with micro-fees
-              (~$0.03/action). No subscriptions, no hidden costs.
+              After the trial: USDC ${STANDARD_USDC_FEE_USD.toFixed(2)} per action (default), or opt into REWARD at ${STANDARD_REWARD_FEE_USD.toFixed(2)} from your dashboard. Twitter/X premium is USDC ${TWITTER_PREMIUM_USDC_FEE_USD.toFixed(2)} only — no trial, no REWARD discount.
             </Typography>
             <Button variant="contained" size="large" onClick={handleClick}>
               Claim Free Trial
