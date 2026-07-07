@@ -7,6 +7,7 @@ const logger = require('./utils/logger');
 const database = require('./config/database');
 const websocketService = require('./services/websocketService');
 const webhookService = require('./services/webhookService');
+const logRetentionService = require('./services/logRetentionService');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -97,6 +98,8 @@ async function gracefulShutdown() {
   try {
     // Close WebSocket connections
     await websocketService.cleanup();
+
+    logRetentionService.stopScheduledCleanup();
     
     // Close database connection
     await database.close();
@@ -128,6 +131,8 @@ async function startServer() {
 
     // Initialize WebSocket connections for active subscriptions
     await initializeActiveSubscriptions();
+
+    logRetentionService.startScheduledCleanup();
     
   } catch (error) {
     logger.error('Failed to start server:', error);

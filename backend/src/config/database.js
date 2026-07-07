@@ -85,6 +85,7 @@ class Database {
       await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active)');
       await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_logs_subscription_id ON webhook_logs(subscription_id)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_webhook_logs_delivered_at ON webhook_logs(delivered_at)');
     } finally {
       client.release();
     }
