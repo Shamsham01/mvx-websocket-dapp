@@ -78,7 +78,28 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
           ...(response.data.timestamp != null && { timestamp: response.data.timestamp })
         };
 
-        for (const sub of subscriptions) {
+        // Re-evaluate with the same parent-asset matching path as the WebSocket listener.
+        // Deliver the SCR row (confirmedTransfer), never replace it with the parent tx.
+        // When polling originalTxHash for an SCR, response.data is already the parent.
+        let toDeliver = subscriptions;
+        if (typeof wsService.matchSubscriptionsForTransfer === 'function') {
+          const parentHint =
+            originalTransfer?.originalTxHash &&
+            txHash === originalTransfer.originalTxHash &&
+            response.data &&
+            typeof response.data === 'object'
+              ? response.data
+              : null;
+          const { subscriptionsToDeliver } = await wsService.matchSubscriptionsForTransfer(
+            confirmedTransfer,
+            subscriptions,
+            network,
+            { parentTransaction: parentHint }
+          );
+          toDeliver = subscriptionsToDeliver;
+        }
+
+        for (const sub of toDeliver) {
           await webhookService.deliverWebhook(sub, confirmedTransfer);
         }
         return;
@@ -100,6 +121,7 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
 
 module.exports = {
   scheduleConfirmationCheck,
+  pollUntilConfirmed,
   ENABLED,
   POLL_DELAY_MS,
   POLL_RETRIES

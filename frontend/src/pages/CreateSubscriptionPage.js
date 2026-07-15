@@ -300,7 +300,7 @@ export default function CreateSubscriptionPage() {
                   label="EGLD transfers only (API)"
                 />
                 <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5, ml: 4.5 }}>
-                  ON: MultiversX filters native EGLD legs only. OFF: no token filter at API level. ESDT (e.g. REWARD-cf6eac) — use Token identifier below; USDC-style API token filters are unreliable.
+                  ON: MultiversX filters native EGLD legs only. OFF: no EGLD-only API filter. For global ESDT activity use Token identifier alone (e.g. REWARD-cf6eac).
                 </Typography>
               </Grid>
 
@@ -367,7 +367,7 @@ export default function CreateSubscriptionPage() {
                   value={form.filters.tokenIdentifier}
                   onChange={(e) => setForm({ ...form, filters: { ...form.filters, tokenIdentifier: e.target.value } })}
                   placeholder="REWARD-cf6eac"
-                  helperText="Fungible ESDT on this row (e.g. farm reward REWARD-cf6eac). Not for EGLD — use EGLD transfers only (API) or amount min/max."
+                  helperText="Fungible ESDT (e.g. REWARD-cf6eac). Can be used alone for global token activity across wallets, DEXes, and contracts. Not for EGLD — use EGLD transfers only."
                 />
               </Grid>
               <Grid item xs={12} md={6}>
@@ -378,7 +378,7 @@ export default function CreateSubscriptionPage() {
                     setForm({ ...form, filters: { ...form.filters, collectionIdentifier: e.target.value } })
                   }
                   placeholder="EMP-897b49"
-                  helperText="NFT collection on this row (e.g. Empyreans EMP-897b49). Matches identifiers like EMP-897b49-3c."
+                  helperText="NFT collection (e.g. Empyreans EMP-897b49). Matches this row, or for SCRs the original parent transaction when the collection is only on originalTxHash."
                 />
               </Grid>
               <Grid item xs={12} md={6}>

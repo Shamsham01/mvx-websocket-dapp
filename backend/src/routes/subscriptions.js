@@ -33,22 +33,21 @@ const validateFilters = (filters) => {
     return 'At least one filter must be provided';
   }
 
-  const apiFilterKeys = ['address', 'sender', 'receiver', 'token', 'relayer'];
+  // MultiversX subscribeCustomTransfers accepts address/sender/receiver/relayer/token (EGLD or ESDT).
+  // tokenIdentifier maps to upstream `token` via resolveApiTokenFilter.
+  const apiFilterKeys = ['address', 'sender', 'receiver', 'token', 'relayer', 'tokenIdentifier'];
   const hasApiFilter =
     apiFilterKeys.some((k) => hasFilterValue(filters[k])) || filters.egldOnly === true;
   const hasAmountFilter = hasFilterValue(filters.amountMin) || hasFilterValue(filters.amountMax);
 
   if (hasFilterValue(filters.function) && !hasApiFilter) {
-    return 'Function filter must be combined with at least one of: address, sender, receiver, token';
-  }
-  if (hasFilterValue(filters.tokenIdentifier) && !hasApiFilter) {
-    return 'Token identifier filter must be combined with at least one of: address, sender, receiver, token';
+    return 'Function filter must be combined with at least one of: address, sender, receiver, token, or tokenIdentifier';
   }
   if (hasFilterValue(filters.collectionIdentifier) && !hasApiFilter) {
-    return 'Collection identifier filter must be combined with at least one of: address, sender, receiver, token';
+    return 'Collection identifier filter must be combined with at least one of: address, sender, receiver, token, or tokenIdentifier';
   }
   if (hasAmountFilter && !hasApiFilter) {
-    return 'Amount filter must be combined with at least one of: address, sender, receiver, token';
+    return 'Amount filter must be combined with at least one of: address, sender, receiver, token, or tokenIdentifier';
   }
   if (
     hasAmountFilter &&

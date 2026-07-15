@@ -204,7 +204,34 @@ Filter by ESDT in `transfer.action.arguments.transfers` (client-side). For SCRs 
 
 - **sender**: Farm contract (SCR sender)
 - **function**: `ESDTTransfer` (SCR function)
-- **tokenIdentifier**: ESDT in `action.arguments.transfers` (client-side only)
+- **tokenIdentifier**: ESDT identifier — also subscribed upstream as MultiversX `token` when present
+
+### Global token activity (tokenIdentifier only)
+Track all transfers involving a fungible ESDT without tying the subscription to a DEX, wallet, or smart contract:
+
+```json
+{
+  "name": "REWARD Activity",
+  "webhook_url": "https://your-webhook.com/reward-activity",
+  "filters": {
+    "tokenIdentifier": "REWARD-cf6eac",
+    "onlyConfirmed": true
+  },
+  "network": "mainnet"
+}
+```
+
+MakeX subscribes to MultiversX with `{ "token": "REWARD-cf6eac" }` and still validates `tokenIdentifier` client-side. This covers wallets, DEXes, aggregators, smart contracts, and Smart Contract Results that move the token. Events are token **activity**, not classified buy/sell trades.
+
+Optional amount filter (decimals loaded from MultiversX on save):
+
+```json
+{
+  "tokenIdentifier": "REWARD-cf6eac",
+  "amountMin": "10000",
+  "onlyConfirmed": true
+}
+```
 
 ### Madcock / XOXNO Launchpad NFT mints (Sender + Function or Collection)
 For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
@@ -218,8 +245,25 @@ For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
 **Common mistake:** Address typo — ensure `5shh` (not `5hh`) in the contract address.
 
 ### Amount and collection filters (client-side)
-- **amountMin / amountMax**: Human-readable EGLD (e.g. `1000` for whale moves, `0.5` for small swaps). Not wei.
-- **collectionIdentifier**: NFT collection (e.g. `MADC-d03f58`). Matches `operations[].collection` and token identifiers. Use without `function` to catch any transfer involving that collection.
+- **amountMin / amountMax**: Human-readable EGLD (e.g. `1000` for whale moves, `0.5` for small swaps). Not wei. Amount filters always evaluate against the current streamed row (not the parent transaction).
+- **collectionIdentifier**: NFT collection (e.g. `MADC-d03f58` or `EMP-897b49`). Matches `operations[].collection` and token identifiers on the current row. Use without `function` to catch any transfer involving that collection.
+
+**SmartContractResult + collectionIdentifier:** MultiversX often exposes NFT collection data only on the original parent transaction (`originalTxHash`), not on the SCR row itself. MakeX resolves missing collection/token context from that parent for SCR subscriptions when needed—without changing your subscription format.
+
+Example — track OOX Empyreans listings without receiving every marketplace listing:
+
+```json
+{
+  "address": "erd1qqqqqqqqqqqqqpgqwp73w2a9eyzs64eltupuz3y3hv798vlv899qrjnflg",
+  "function": "auctionToken",
+  "onlyConfirmed": true,
+  "transactionType": "SmartContractResult",
+  "matchTopLevelOnly": true,
+  "collectionIdentifier": "EMP-897b49"
+}
+```
+
+Row filters (`address`, `function`, `transactionType`, `matchTopLevelOnly`) still apply to the SCR. Only asset filters (`collectionIdentifier`, `tokenIdentifier`) may use the parent as context. The webhook still receives the SCR, not the parent transaction.
 
 ## 📡 WebSocket Data Flow — Simple Model
 
@@ -253,13 +297,13 @@ For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
 
 ### Filtering (function, receiver, token, etc.)
 
-1. **MultiversX WebSocket** sends events. We filter by subscription rules (address, sender, receiver, token, function, etc.).
-2. **Client-side filters:** `function`, `tokenIdentifier`, `collectionIdentifier`, `amountMin`/`amountMax` are applied after receipt (API filters are limited).
+1. **MultiversX WebSocket** sends events. We filter by subscription rules (address, sender, receiver, token / tokenIdentifier, function, etc.).
+2. **Client-side filters:** `function`, `tokenIdentifier` (also sent upstream as `token` when set), `collectionIdentifier`, `amountMin`/`amountMax` are applied after receipt.
 3. **Deduplication:** Same tx + same status = one delivery. Subscriptions with identical API filters share one WebSocket subscription.
 
-**Function filter:** Must be combined with at least one of: address, sender, receiver, token. The API's function filter is unreliable.
+**Function filter:** Must be combined with at least one of: address, sender, receiver, token, or tokenIdentifier. The API's function filter is unreliable.
 
-**Token identifier:** For ESDT in SCRs (e.g. farm rewards), use `tokenIdentifier`; for API-level tokens use `token`.
+**Token identifier:** Use `tokenIdentifier` for ESDT (e.g. `REWARD-cf6eac`). It may be the only filter — MakeX maps it to MultiversX `subscribeCustomTransfers` `{ token: "…" }` and still matches client-side. `egldOnly` or legacy `token: "EGLD"` covers native EGLD.
 
 ## 🔐 Authentication Flow
 

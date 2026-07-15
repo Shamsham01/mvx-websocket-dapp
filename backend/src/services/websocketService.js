@@ -225,16 +225,10 @@ class WebSocketService {
         );
       }
 
-      // API requires at least one filter; we omit function (filtered client-side)
-      if (filters.token && !apiToken) {
-        logger.warn(
-          `Subscription ${subscriptionId}: API token "${filters.token}" is not sent to MultiversX (EGLD-only). Use tokenIdentifier (e.g. REWARD-cf6eac) for ESDT.`
-        );
-      }
-
+      // API requires at least one filter; function / collection / amounts are client-side only
       if (Object.keys(payload).length === 0) {
         throw new Error(
-          'At least one API filter is required: address, sender, receiver, relayer, or EGLD-only'
+          'At least one API filter is required: address, sender, receiver, relayer, or token'
         );
       }
 
@@ -383,6 +377,99 @@ class WebSocketService {
   }
 
   /**
+   * Shared matching path for WebSocket handling and confirmation polling.
+   * Row-level filters apply to the current transfer only. Asset filters may fall
+   * back to the original parent transaction (originalTxHash) once per transfer.
+   *
+   * @param {object} [options]
+   * @param {object|null} [options.parentTransaction] - Reuse an already-fetched parent
+   * @returns {Promise<{ matchedSubs: any[], subscriptionsToDeliver: any[] }>}
+   */
+  async matchSubscriptionsForTransfer(transfer, subscriptions, network, options = {}) {
+    const matchedSubs = [];
+    const subscriptionsToDeliver = [];
+    const txId = transfer?.txHash || transfer?.hash || 'unknown';
+
+    const candidates = [];
+    for (const subscription of subscriptions) {
+      const filters = parseJson(subscription.filters);
+      if (!filterMatching.matchesRowFilters(transfer, filters)) continue;
+      candidates.push({ subscription, filters });
+    }
+
+    let parentTransaction = options.parentTransaction || null;
+    const needsParent = candidates.some(({ filters }) =>
+      filterMatching.requiresParentAssetContext(transfer, filters)
+    );
+
+    if (!parentTransaction && needsParent && transfer?.originalTxHash) {
+      parentTransaction = await this.fetchTransactionDetails(network, transfer.originalTxHash);
+      if (!parentTransaction) {
+        logger.warn(
+          `Parent transaction context unavailable for SCR ${txId}, originalTxHash=${transfer.originalTxHash}`
+        );
+      }
+    }
+
+    for (const { subscription, filters } of candidates) {
+      const topLevelOnly = filters?.matchTopLevelOnly === true;
+      const needsAssetParent = filterMatching.requiresParentAssetContext(transfer, filters);
+
+      if (FILTER_DEBUG && needsAssetParent && filters?.collectionIdentifier) {
+        logger.debug(
+          `SCR ${txId}: collection ${filters.collectionIdentifier} not on current row; checking parent ${transfer.originalTxHash}`
+        );
+      }
+      if (FILTER_DEBUG && needsAssetParent && filters?.tokenIdentifier) {
+        logger.debug(
+          `SCR ${txId}: tokenIdentifier ${filters.tokenIdentifier} not on current row; checking parent ${transfer.originalTxHash}`
+        );
+      }
+
+      if (!filterMatching.matchesFilters(transfer, filters, { parentTransaction })) {
+        continue;
+      }
+
+      if (
+        FILTER_DEBUG &&
+        parentTransaction &&
+        filters?.collectionIdentifier &&
+        !filterMatching.transferHasCollection(
+          transfer,
+          filters.collectionIdentifier,
+          topLevelOnly
+        ) &&
+        filterMatching.transferHasCollection(
+          parentTransaction,
+          filters.collectionIdentifier,
+          topLevelOnly
+        )
+      ) {
+        logger.debug(
+          `SCR ${txId}: collection ${filters.collectionIdentifier} matched from parent ${transfer.originalTxHash}`
+        );
+      }
+
+      matchedSubs.push(subscription);
+      const status = (transfer?.status || '').toLowerCase();
+      if (filters.onlyConfirmed && status === 'pending') {
+        logger.debug(
+          `Transfer ${txId} matched subscription ${subscription.id} (${subscription.name}, onlyConfirmed: skip pending)`
+        );
+        continue;
+      }
+
+      logger.info(
+        `[subscription] ${subscription.name} (id=${subscription.id}) ← tx ${txId} function=${this.transferFunctionName(transfer)} status=${status}`
+      );
+      subscriptionsToDeliver.push(subscription);
+    }
+    return { matchedSubs, subscriptionsToDeliver };
+  }
+
+  /**
+   * Synchronous row+local-asset match only (no parent fetch).
+   * Prefer matchSubscriptionsForTransfer when parent asset context may be required.
    * @returns {{ matchedSubs: any[], subscriptionsToDeliver: any[] }}
    */
   evaluateTransferAgainstSubscriptions(transfer, subscriptions) {
@@ -460,9 +547,10 @@ class WebSocketService {
 
         const statusLower = (transfer?.status || '').toLowerCase();
         const processedTransfer = await this.maybeEnrichTransfer(transfer, subscriptions, network);
-        let { matchedSubs, subscriptionsToDeliver } = this.evaluateTransferAgainstSubscriptions(
+        let { matchedSubs, subscriptionsToDeliver } = await this.matchSubscriptionsForTransfer(
           processedTransfer,
-          subscriptions
+          subscriptions,
+          network
         );
 
         const schedulePoll = statusLower === 'pending' && matchedSubs.length > 0;
@@ -580,8 +668,8 @@ class WebSocketService {
     return status === 'success' || status === 'pending';
   }
 
-  matchesFilters(transfer, filters) {
-    return filterMatching.matchesFilters(transfer, filters);
+  matchesFilters(transfer, filters, options) {
+    return filterMatching.matchesFilters(transfer, filters, options);
   }
 
   hasDelivered(dedupeKey) {

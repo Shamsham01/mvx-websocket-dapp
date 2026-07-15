@@ -229,22 +229,46 @@ function resolveAmountDecimals(filters) {
   return null;
 }
 
+/**
+ * MultiversX subscribeCustomTransfers `token` field: EGLD or ESDT identifier.
+ * Prefer egldOnly, then tokenIdentifier, then legacy token. Do not lowercase ESDT ids.
+ */
 function resolveApiTokenFilter(filters) {
   if (!filters) return undefined;
-  if (filters.egldOnly === true) return 'EGLD';
-  const legacy = filters.token;
-  if (!legacy) return undefined;
-  const norm = normalizeValue(legacy);
-  if (norm === 'egld' || norm === 'egld-000000') return 'EGLD';
-  return undefined;
+
+  if (filters.egldOnly === true) {
+    return 'EGLD';
+  }
+
+  const tokenIdentifier =
+    typeof filters.tokenIdentifier === 'string' ? filters.tokenIdentifier.trim() : '';
+  if (tokenIdentifier) {
+    return tokenIdentifier;
+  }
+
+  const legacyToken = typeof filters.token === 'string' ? filters.token.trim() : '';
+  if (!legacyToken) {
+    return undefined;
+  }
+
+  const normalized = normalizeValue(legacyToken);
+  if (normalized === 'egld' || normalized === 'egld-000000') {
+    return 'EGLD';
+  }
+
+  return legacyToken;
 }
 
-function matchesFilters(transfer, filters) {
+/**
+ * Row-level identity filters only (never use parent transaction).
+ * Parent asset context must not satisfy these.
+ */
+function matchesRowFilters(transfer, filters) {
   const normalizedFilters = filters || {};
   const topLevelOnly = normalizedFilters.matchTopLevelOnly === true;
-  const sender = normalizeValue(transfer.sender);
-  const receiver = normalizeValue(transfer.receiver);
-  const relayer = normalizeValue(transfer.relayer);
+  const sender = normalizeValue(transfer?.sender);
+  const receiver = normalizeValue(transfer?.receiver);
+  const relayer = normalizeValue(transfer?.relayer);
 
   if (normalizedFilters.transactionType) {
     if (!transactionTypeMatches(transfer, normalizedFilters.transactionType)) {
@@ -284,20 +308,6 @@ function matchesFilters(transfer, filters) {
     }
   }
 
-  if (normalizedFilters.token) {
-    const targetToken = normalizeValue(normalizedFilters.token);
-    if (!transferHasToken(transfer, targetToken, topLevelOnly)) {
-      return false;
-    }
-  }
-
-  if (normalizedFilters.tokenIdentifier) {
-    const targetToken = normalizeValue(normalizedFilters.tokenIdentifier);
-    if (!transferHasToken(transfer, targetToken, topLevelOnly)) {
-      return false;
-    }
-  }
-
   if (normalizedFilters.address) {
     const normalizedAddress = normalizeValue(normalizedFilters.address);
     const matchesAddress =
@@ -314,13 +324,117 @@ function matchesFilters(transfer, filters) {
     return false;
   }
 
-  if (normalizedFilters.collectionIdentifier) {
-    const target = normalizeValue(normalizedFilters.collectionIdentifier);
-    if (!transferHasCollection(transfer, target, topLevelOnly)) {
+  return true;
+}
+
+/**
+ * True when an SCR has originalTxHash and an asset filter is not satisfied by the current row.
+ * Callers should still apply matchesRowFilters before fetching the parent.
+ */
+function requiresParentAssetContext(transfer, filters) {
+  if (!transfer?.originalTxHash) {
+    return false;
+  }
+
+  const normalizedFilters = filters || {};
+  const topLevelOnly = normalizedFilters.matchTopLevelOnly === true;
+
+  if (
+    normalizedFilters.collectionIdentifier &&
+    !transferHasCollection(transfer, normalizedFilters.collectionIdentifier, topLevelOnly)
+  ) {
+    return true;
+  }
+
+  if (
+    normalizedFilters.tokenIdentifier &&
+    !transferHasToken(transfer, normalizedFilters.tokenIdentifier, topLevelOnly)
+  ) {
+    return true;
+  }
+
+  if (normalizedFilters.token && !transferHasToken(transfer, normalizedFilters.token, topLevelOnly)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Asset filter on current row, optionally falling back to parent tx asset context.
+ * Does not deep-merge parent into transfer — parent is checked separately.
+ */
+function transferSatisfiesAssetFilter(transfer, checkFn, target, topLevelOnly, parentTransaction) {
+  if (checkFn(transfer, target, topLevelOnly)) {
+    return true;
+  }
+  if (!parentTransaction) {
+    return false;
+  }
+  // Parent is asset-context only: still respect topLevelOnly so nested buy results are not used.
+  return checkFn(parentTransaction, target, topLevelOnly);
+}
+
+/**
+ * @param {object} transfer - Current WebSocket / SCR row
+ * @param {object} filters - Subscription filters
+ * @param {{ parentTransaction?: object|null }} [options] - Optional parent tx for SCR asset fallback
+ */
+function matchesFilters(transfer, filters, options = {}) {
+  const normalizedFilters = filters || {};
+  const topLevelOnly = normalizedFilters.matchTopLevelOnly === true;
+  const parentTransaction = options?.parentTransaction || null;
+
+  if (!matchesRowFilters(transfer, normalizedFilters)) {
+    return false;
+  }
+
+  if (normalizedFilters.token) {
+    const targetToken = normalizeValue(normalizedFilters.token);
+    if (
+      !transferSatisfiesAssetFilter(
+        transfer,
+        transferHasToken,
+        targetToken,
+        topLevelOnly,
+        parentTransaction
+      )
+    ) {
       return false;
     }
   }
 
+  if (normalizedFilters.tokenIdentifier) {
+    const targetToken = normalizeValue(normalizedFilters.tokenIdentifier);
+    if (
+      !transferSatisfiesAssetFilter(
+        transfer,
+        transferHasToken,
+        targetToken,
+        topLevelOnly,
+        parentTransaction
+      )
+    ) {
+      return false;
+    }
+  }
+
+  if (normalizedFilters.collectionIdentifier) {
+    const target = normalizeValue(normalizedFilters.collectionIdentifier);
+    if (
+      !transferSatisfiesAssetFilter(
+        transfer,
+        transferHasCollection,
+        target,
+        topLevelOnly,
+        parentTransaction
+      )
+    ) {
+      return false;
+    }
+  }
+
+  // Amount filters stay on the current row only (do not inherit parent value/token legs).
   const hasAmountMin = normalizedFilters.amountMin != null && normalizedFilters.amountMin !== '';
   const hasAmountMax = normalizedFilters.amountMax != null && normalizedFilters.amountMax !== '';
   if (hasAmountMin || hasAmountMax) {
@@ -358,5 +472,7 @@ module.exports = {
   resolveAmountDecimals,
   resolveApiTokenFilter,
   transactionTypeMatches,
+  matchesRowFilters,
+  requiresParentAssetContext,
   matchesFilters,
 };
