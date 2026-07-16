@@ -1,15 +1,102 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const { parseJson } = require('../utils/parseJson');
 const database = require('../config/database');
+
+const PARENT_OPERATIONS_CACHE_TTL_MS = 10 * 60 * 1000;
+const PARENT_OPERATIONS_CACHE_MAX = 1000;
 
 class WebhookService {
   constructor() {
     this.timeout = parseInt(process.env.WEBHOOK_TIMEOUT_MS) || 10000;
     this.maxRetries = parseInt(process.env.WEBHOOK_MAX_RETRIES) || 3;
+    this.parentOperationsCache = new Map();
+    this.apiEndpoints = {
+      mainnet: process.env.MVX_API_MAINNET || 'https://api.multiversx.com',
+      testnet: process.env.MVX_API_TESTNET || 'https://testnet-api.multiversx.com',
+      devnet: process.env.MVX_API_DEVNET || 'https://devnet-api.multiversx.com'
+    };
+  }
+
+  shouldRestoreParentOperations(subscription, transferData, options = {}) {
+    if (options.movement) return false;
+
+    const filters = parseJson(subscription?.filters) || {};
+    if (filters.movementMode === 'classified') return false;
+    if (!filters.collectionIdentifier) return false;
+    if (!transferData?.originalTxHash) return false;
+
+    const operations = transferData?.operations;
+    return !Array.isArray(operations) || operations.length === 0;
+  }
+
+  async fetchParentOperations(network, originalTxHash) {
+    const apiUrl = this.apiEndpoints[network];
+    if (!apiUrl || !originalTxHash) return null;
+
+    const cacheKey = `${network}:${originalTxHash}`;
+    const cached = this.parentOperationsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.operations;
+    }
+    if (cached) this.parentOperationsCache.delete(cacheKey);
+
+    try {
+      const response = await axios.get(`${apiUrl}/transactions/${originalTxHash}`, {
+        timeout: 15000
+      });
+      const operations = Array.isArray(response.data?.operations)
+        ? response.data.operations
+        : [];
+
+      this.parentOperationsCache.set(cacheKey, {
+        operations,
+        expiresAt: Date.now() + PARENT_OPERATIONS_CACHE_TTL_MS
+      });
+      if (this.parentOperationsCache.size > PARENT_OPERATIONS_CACHE_MAX) {
+        const oldestKey = this.parentOperationsCache.keys().next().value;
+        this.parentOperationsCache.delete(oldestKey);
+      }
+
+      return operations;
+    } catch (error) {
+      logger.warn(
+        `Parent operations enrich failed for ${originalTxHash}: ${error.message}`
+      );
+      return null;
+    }
+  }
+
+  async prepareTransferForDelivery(subscription, transferData, options = {}) {
+    if (!this.shouldRestoreParentOperations(subscription, transferData, options)) {
+      return transferData;
+    }
+
+    const network = subscription?.network || 'mainnet';
+    const operations = await this.fetchParentOperations(
+      network,
+      transferData.originalTxHash
+    );
+    if (!Array.isArray(operations) || operations.length === 0) {
+      return transferData;
+    }
+
+    logger.debug(
+      `Restored ${operations.length} parent operation(s) for SCR ${transferData?.txHash || transferData?.hash || 'unknown'} from ${transferData.originalTxHash}`
+    );
+    return {
+      ...transferData,
+      operations
+    };
   }
 
   async deliverWebhook(subscription, transferData, options = {}) {
     const startTime = Date.now();
+    const payloadTransfer = await this.prepareTransferForDelivery(
+      subscription,
+      transferData,
+      options
+    );
     let attempt = 0;
     let success = false;
     let statusCode = null;
@@ -22,7 +109,7 @@ class WebhookService {
       try {
         logger.debug(`Delivering webhook for subscription ${subscription.id}, attempt ${attempt}`);
 
-        const status = (transferData?.status || '').toLowerCase();
+        const status = (payloadTransfer?.status || '').toLowerCase();
         const isConfirmed = status === 'success';
 
         const response = await axios.post(
@@ -33,7 +120,7 @@ class WebhookService {
               name: subscription.name,
               user_address: subscription.user_address
             },
-            transfer: transferData,
+            transfer: payloadTransfer,
             ...(options.movement && { movement: options.movement }),
             confirmed: isConfirmed,
             timestamp: new Date().toISOString()
@@ -53,7 +140,7 @@ class WebhookService {
 
         if (success) {
           logger.info(
-            `[webhook] delivered → ${subscription.name} (id=${subscription.id}) HTTP ${statusCode} tx=${transferData?.txHash || transferData?.hash || 'n/a'}`
+            `[webhook] delivered → ${subscription.name} (id=${subscription.id}) HTTP ${statusCode} tx=${payloadTransfer?.txHash || payloadTransfer?.hash || 'n/a'}`
           );
         } else {
           logger.warn(`Webhook delivery failed for subscription ${subscription.id}, status: ${statusCode}`);
@@ -83,7 +170,7 @@ class WebhookService {
     // Log the delivery attempt
     await this.logDelivery(
       subscription.id,
-      transferData,
+      payloadTransfer,
       statusCode,
       responseText,
       errorMessage,
