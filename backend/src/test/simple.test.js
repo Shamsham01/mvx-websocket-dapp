@@ -1,4 +1,10 @@
 const request = require('supertest');
+jest.mock('../config/database', () => ({
+  close: jest.fn(),
+  ensureInitialized: jest.fn(),
+  get: jest.fn(),
+  query: jest.fn(),
+}));
 const app = require('../index');
 
 describe('MultiversX WebSocket DApp API', () => {

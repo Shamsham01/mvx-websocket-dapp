@@ -19,7 +19,12 @@ const hasFilterValue = (value) => {
   return true;
 };
 
-const DELIVERY_OPTION_KEYS = ['onlyConfirmed', 'matchTopLevelOnly', 'egldOnly', 'tokenDecimals'];
+const DELIVERY_OPTION_KEYS = [
+  'onlyConfirmed', 'matchTopLevelOnly', 'egldOnly', 'tokenDecimals',
+  'movementMode', 'movementTypes', 'movementAmountMin', 'movementAmountMax',
+];
+const MOVEMENT_TYPES = new Set(['BUY', 'SELL', 'OTHER']);
+const isDecimalString = (value) => typeof value === 'string' && /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value);
 
 const validateFilters = (filters) => {
   if (!filters || typeof filters !== 'object' || Array.isArray(filters)) {
@@ -39,6 +44,30 @@ const validateFilters = (filters) => {
   const hasApiFilter =
     apiFilterKeys.some((k) => hasFilterValue(filters[k])) || filters.egldOnly === true;
   const hasAmountFilter = hasFilterValue(filters.amountMin) || hasFilterValue(filters.amountMax);
+  const classified = filters.movementMode === 'classified';
+
+  if (classified) {
+    if (!hasFilterValue(filters.tokenIdentifier)) {
+      return 'Classified movement delivery requires a tokenIdentifier';
+    }
+    if (!Array.isArray(filters.movementTypes) || filters.movementTypes.length === 0) {
+      return 'Classified movement delivery requires at least one movement type';
+    }
+    if (filters.movementTypes.some((type) => !MOVEMENT_TYPES.has(type))) {
+      return 'movementTypes may only contain BUY, SELL, or OTHER';
+    }
+    if (filters.onlyConfirmed !== true) {
+      return 'Classified movement delivery requires onlyConfirmed=true';
+    }
+    if (hasAmountFilter) {
+      return 'Classified movement delivery uses movementAmountMin/movementAmountMax, not amountMin/amountMax';
+    }
+    for (const key of ['movementAmountMin', 'movementAmountMax']) {
+      if (hasFilterValue(filters[key]) && !isDecimalString(filters[key])) {
+        return `${key} must be a non-negative decimal string`;
+      }
+    }
+  }
 
   if (hasFilterValue(filters.function) && !hasApiFilter) {
     return 'Function filter must be combined with at least one of: address, sender, receiver, token, or tokenIdentifier';

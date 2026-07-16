@@ -7,8 +7,10 @@ const webhookService = require('./webhookService');
 const confirmationPollingService = require('./confirmationPollingService');
 const filterMatching = require('./filterMatching');
 const { hydrateSubscriptionFilters } = require('./tokenMetadata');
+const { classifyTokenMovement, resolveRootTxHash } = require('./tokenMovementClassifier');
 
 const DEDUPE_CACHE_MAX = 2000;
+const ROOT_TRANSACTION_CACHE_TTL_MS = 10 * 60 * 1000;
 
 /** Set LOG_LEVEL=debug or TRANSFER_LOG_VERBOSE=1 for per-transfer and no-match dumps. */
 const FILTER_DEBUG =
@@ -47,6 +49,7 @@ class WebSocketService {
     this.subscriptions = new Map(); // subscriptionId -> { shard, payload, network }
     this.payloadToSubscriptionIds = new Map(); // payloadKey -> Set<subscriptionId>
     this.deliveredKeys = new Set(); // txHash|status for deduplication (timestamp removed for stronger dedupe)
+    this.rootTransactionCache = new Map();
     this.apiEndpoints = {
       mainnet: process.env.MVX_API_MAINNET || 'https://api.multiversx.com',
       testnet: process.env.MVX_API_TESTNET || 'https://testnet-api.multiversx.com',
@@ -376,6 +379,62 @@ class WebSocketService {
     }
   }
 
+  async fetchRootTransaction(network, rootTxHash) {
+    const key = `${network}:${rootTxHash}`;
+    const cached = this.rootTransactionCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const value = await this.fetchTransactionDetails(network, rootTxHash);
+    if (value) this.rootTransactionCache.set(key, { value, expiresAt: Date.now() + ROOT_TRANSACTION_CACHE_TTL_MS });
+    return value;
+  }
+
+  /**
+   * Produces raw and classified webhook work once per transfer. Kept here so
+   * confirmation polling uses exactly the same classification and filtering.
+   */
+  async buildDeliveryPlansForTransfer(transfer, subscriptions, network, options = {}) {
+    const match = await this.matchSubscriptionsForTransfer(transfer, subscriptions, network, options);
+    const raw = [];
+    const classified = [];
+    const status = (transfer?.status || '').toLowerCase();
+    const classificationCache = new Map();
+    const rootHash = resolveRootTxHash(transfer);
+    let rootTransaction = options.rootTransaction || options.parentTransaction || null;
+
+    for (const subscription of match.subscriptionsToDeliver) {
+      const filters = parseJson(subscription.filters) || {};
+      if (filters.movementMode !== 'classified') {
+        raw.push({ subscription, transfer });
+        continue;
+      }
+      // Classified movements are confirmed-only, even for malformed legacy rows.
+      if (status !== 'success' || !rootHash) continue;
+      if (!rootTransaction) rootTransaction = await this.fetchRootTransaction(network, rootHash);
+      if (!rootTransaction) continue;
+      const token = filters.tokenIdentifier;
+      const cacheKey = `${rootHash}:${token}`;
+      let movement = classificationCache.get(cacheKey);
+      if (movement === undefined) {
+        movement = await classifyTokenMovement({
+          triggerTransfer: transfer, rootTransaction, targetTokenIdentifier: token,
+          tokenDecimals: filters.tokenDecimals, network,
+        }).catch((error) => {
+          logger.debug(`Movement classification failed for ${rootHash}: ${error.message}`);
+          return null;
+        });
+        classificationCache.set(cacheKey, movement);
+      }
+      if (!movement || !filters.movementTypes?.includes(movement.type)) continue;
+      const amount = BigInt(movement.targetToken.atomicAmount);
+      const decimals = Number(filters.tokenDecimals) || 0;
+      const min = filters.movementAmountMin ? filterMatching.parseAmount(filters.movementAmountMin, decimals) : null;
+      const max = filters.movementAmountMax ? filterMatching.parseAmount(filters.movementAmountMax, decimals) : null;
+      if ((min != null && amount < min) || (max != null && amount > max)) continue;
+      classified.push({ subscription, transfer, movement, dedupeKey: `movement|${subscription.id}|${rootHash}|${token}` });
+    }
+    return { ...match, raw, classified };
+  }
+
   /**
    * Shared matching path for WebSocket handling and confirmation polling.
    * Row-level filters apply to the current transfer only. Asset filters may fall
@@ -537,24 +596,17 @@ class WebSocketService {
           continue;
         }
 
-        const dedupeKey = `${txId}|${transfer?.status ?? ''}`;
-        if (this.deliveredKeys.has(dedupeKey)) {
-          logger.debug(
-            `Skipping duplicate transfer ${txId} status=${transfer?.status} (webhook already delivered, in-memory)`
-          );
-          continue;
-        }
-
         const statusLower = (transfer?.status || '').toLowerCase();
         const processedTransfer = await this.maybeEnrichTransfer(transfer, subscriptions, network);
-        let { matchedSubs, subscriptionsToDeliver } = await this.matchSubscriptionsForTransfer(
+        const plans = await this.buildDeliveryPlansForTransfer(
           processedTransfer,
           subscriptions,
           network
         );
+        const { matchedSubs, raw, classified } = plans;
 
         const schedulePoll = statusLower === 'pending' && matchedSubs.length > 0;
-        const hasWork = subscriptionsToDeliver.length > 0 || schedulePoll;
+        const hasWork = raw.length > 0 || classified.length > 0 || schedulePoll;
 
         if (!hasWork) {
           if (VERBOSE_TRANSFERS && matchedSubs.length === 0 && subscriptions.length > 0) {
@@ -579,36 +631,20 @@ class WebSocketService {
           continue;
         }
 
-        const claimed = await database.tryClaimDelivered(dedupeKey);
-        if (!claimed) {
-          logger.debug(
-            `Skipping duplicate transfer ${txId} status=${transfer?.status} (another instance owns dedupe for delivery/poll)`
-          );
-          this.deliveredKeys.add(dedupeKey);
-          continue;
-        }
-
-        if (subscriptionsToDeliver.length > 0) {
-          const deliveryResults = await Promise.allSettled(
-            subscriptionsToDeliver.map((sub) =>
-              webhookService.deliverWebhook(sub, processedTransfer)
-            )
-          );
-          const anyDelivered = deliveryResults.some(
-            (r) => r.status === 'fulfilled' && r.value?.success === true
-          );
-          if (anyDelivered) {
-            this.deliveredKeys.add(dedupeKey);
-            if (this.deliveredKeys.size > DEDUPE_CACHE_MAX) {
-              const arr = [...this.deliveredKeys];
-              this.deliveredKeys = new Set(arr.slice(-Math.floor(DEDUPE_CACHE_MAX / 2)));
-            }
-          } else {
-            await database.releaseDeliveredClaim(dedupeKey);
-            logger.warn(
-              `Transfer ${txId}: all webhook deliveries failed for ${subscriptionsToDeliver.length} subscription(s); dedupe released for retry`
-            );
+        const rawDedupeKey = `${txId}|${transfer?.status ?? ''}`;
+        if (raw.length > 0 && !this.deliveredKeys.has(rawDedupeKey)) {
+          const claimed = await database.tryClaimDelivered(rawDedupeKey);
+          if (claimed) {
+            const results = await Promise.allSettled(raw.map((plan) => webhookService.deliverWebhook(plan.subscription, plan.transfer)));
+            if (results.some((result) => result.status === 'fulfilled' && result.value?.success)) this.recordDelivered(rawDedupeKey);
+            else await database.releaseDeliveredClaim(rawDedupeKey);
           }
+        }
+        for (const plan of classified) {
+          if (this.hasDelivered(plan.dedupeKey) || !(await database.tryClaimDelivered(plan.dedupeKey))) continue;
+          const result = await webhookService.deliverWebhook(plan.subscription, plan.transfer, { movement: plan.movement });
+          if (result?.success) this.recordDelivered(plan.dedupeKey);
+          else await database.releaseDeliveredClaim(plan.dedupeKey);
         }
 
         if (schedulePoll) {

@@ -170,6 +170,8 @@ async function initializeActiveSubscriptions() {
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
 
 module.exports = app; // For testing

@@ -233,6 +233,29 @@ Optional amount filter (decimals loaded from MultiversX on save):
 }
 ```
 
+### Classified fungible-token movements
+Use classified delivery to receive a single confirmed BUY, SELL, or OTHER webhook for
+the initiating wallet's net movement across the complete original transaction. It is
+appropriate for swap automation; plain token activity remains the backward-compatible
+default.
+
+```json
+{
+  "tokenIdentifier": "REWARD-cf6eac",
+  "movementMode": "classified",
+  "movementTypes": ["BUY", "SELL"],
+  "movementAmountMin": "10000",
+  "onlyConfirmed": true
+}
+```
+
+`movementAmountMin` and `movementAmountMax` are human-readable absolute net token
+amounts for the root transaction, not individual WebSocket rows. Classified
+subscriptions require `tokenIdentifier`, a non-empty allowed movement type list, and
+`onlyConfirmed: true`; do not combine them with raw `amountMin` or `amountMax`.
+Classified payloads preserve the `transfer` object and add a compact `movement` object
+with type, confidence, trader, target amount, counter-assets, fee, hashes, and evidence.
+
 ### Madcock / XOXNO Launchpad NFT mints (Sender + Function or Collection)
 For NFT mints from the Madcock launchpad (or similar XOXNO launchpad contracts):
 

@@ -165,7 +165,16 @@ export default function SubscriptionsPage() {
                       backgroundColor: index % 2 === 0 ? 'transparent' : 'rgba(15, 23, 42, 0.26)',
                     }}
                   >
-                    <TableCell>{sub.name}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">{sub.name}</Typography>
+                      {sub.filters?.tokenIdentifier && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                          {sub.filters?.movementMode === 'classified'
+                            ? `Classified: ${(sub.filters.movementTypes || []).join(' + ')}`
+                            : 'Raw activity'}
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell sx={{ maxWidth: 320 }}>
                       <CopyableField value={sub.webhook_url} onCopy={() => notify('Webhook URL copied', 'success')} />
                     </TableCell>

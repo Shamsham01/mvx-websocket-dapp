@@ -60,16 +60,7 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
 
       const txStatus = (response.data.status || '').toLowerCase();
       if (txStatus === 'success' || txStatus === 'fail' || txStatus === 'invalid') {
-        const deliveredTxHash = originalTransfer?.txHash || originalTransfer?.hash || txHash;
-        const dedupeKey = `${deliveredTxHash}|${txStatus}`;
-        const claimed = await database.tryClaimDelivered(dedupeKey);
-        if (!claimed) {
-          logger.debug(`Confirmation poll: tx ${txHash} status=${txStatus} already delivered (DB dedupe), skipping`);
-          return;
-        }
-
         logger.info(`[subscription] confirmation poll tx ${txHash} final status=${txStatus} (attempt ${attempt})`);
-        wsService.recordDelivered(dedupeKey);
 
         const confirmedTransfer = {
           ...originalTransfer,
@@ -78,29 +69,22 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
           ...(response.data.timestamp != null && { timestamp: response.data.timestamp })
         };
 
-        // Re-evaluate with the same parent-asset matching path as the WebSocket listener.
-        // Deliver the SCR row (confirmedTransfer), never replace it with the parent tx.
-        // When polling originalTxHash for an SCR, response.data is already the parent.
-        let toDeliver = subscriptions;
-        if (typeof wsService.matchSubscriptionsForTransfer === 'function') {
-          const parentHint =
-            originalTransfer?.originalTxHash &&
-            txHash === originalTransfer.originalTxHash &&
-            response.data &&
-            typeof response.data === 'object'
-              ? response.data
-              : null;
-          const { subscriptionsToDeliver } = await wsService.matchSubscriptionsForTransfer(
-            confirmedTransfer,
-            subscriptions,
-            network,
-            { parentTransaction: parentHint }
-          );
-          toDeliver = subscriptionsToDeliver;
+        const parentHint = response.data && typeof response.data === 'object' ? response.data : null;
+        const plans = await wsService.buildDeliveryPlansForTransfer(
+          confirmedTransfer, subscriptions, network, { parentTransaction: parentHint, rootTransaction: parentHint }
+        );
+        const deliveredTxHash = originalTransfer?.txHash || originalTransfer?.hash || txHash;
+        const rawDedupeKey = `${deliveredTxHash}|${txStatus}`;
+        if (plans.raw.length > 0 && !wsService.hasDelivered(rawDedupeKey) && await database.tryClaimDelivered(rawDedupeKey)) {
+          const results = await Promise.allSettled(plans.raw.map((plan) => webhookService.deliverWebhook(plan.subscription, plan.transfer)));
+          if (results.some((result) => result.status === 'fulfilled' && result.value?.success)) wsService.recordDelivered(rawDedupeKey);
+          else await database.releaseDeliveredClaim(rawDedupeKey);
         }
-
-        for (const sub of toDeliver) {
-          await webhookService.deliverWebhook(sub, confirmedTransfer);
+        for (const plan of plans.classified) {
+          if (wsService.hasDelivered(plan.dedupeKey) || !(await database.tryClaimDelivered(plan.dedupeKey))) continue;
+          const result = await webhookService.deliverWebhook(plan.subscription, plan.transfer, { movement: plan.movement });
+          if (result?.success) wsService.recordDelivered(plan.dedupeKey);
+          else await database.releaseDeliveredClaim(plan.dedupeKey);
         }
         return;
       }

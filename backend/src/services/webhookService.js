@@ -8,7 +8,7 @@ class WebhookService {
     this.maxRetries = parseInt(process.env.WEBHOOK_MAX_RETRIES) || 3;
   }
 
-  async deliverWebhook(subscription, transferData) {
+  async deliverWebhook(subscription, transferData, options = {}) {
     const startTime = Date.now();
     let attempt = 0;
     let success = false;
@@ -34,6 +34,7 @@ class WebhookService {
               user_address: subscription.user_address
             },
             transfer: transferData,
+            ...(options.movement && { movement: options.movement }),
             confirmed: isConfirmed,
             timestamp: new Date().toISOString()
           },

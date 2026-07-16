@@ -4,12 +4,14 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   CircularProgress,
   Divider,
   FormControl,
   FormControlLabel,
   Grid,
   InputLabel,
+  ListItemText,
   MenuItem,
   Select,
   Switch,
@@ -49,7 +51,11 @@ export default function CreateSubscriptionPage() {
       collectionIdentifier: '',
       amountMin: '',
       amountMax: '',
-      onlyConfirmed: false
+      onlyConfirmed: false,
+      movementMode: '',
+      movementTypes: [],
+      movementAmountMin: '',
+      movementAmountMax: '',
     }
   });
   const [saving, setSaving] = useState(false);
@@ -110,7 +116,11 @@ export default function CreateSubscriptionPage() {
               collectionIdentifier: f.collectionIdentifier || '',
               amountMin: f.amountMin ?? '',
               amountMax: f.amountMax ?? '',
-              onlyConfirmed: !!f.onlyConfirmed
+              onlyConfirmed: !!f.onlyConfirmed,
+              movementMode: f.movementMode === 'classified' ? 'classified' : '',
+              movementTypes: Array.isArray(f.movementTypes) ? f.movementTypes : [],
+              movementAmountMin: f.movementAmountMin ?? '',
+              movementAmountMax: f.movementAmountMax ?? '',
             }
           });
         })
@@ -130,8 +140,15 @@ export default function CreateSubscriptionPage() {
     if (form.filters.transactionType) f.transactionType = form.filters.transactionType;
     if (form.filters.tokenIdentifier) f.tokenIdentifier = form.filters.tokenIdentifier;
     if (form.filters.collectionIdentifier) f.collectionIdentifier = form.filters.collectionIdentifier;
-    if (form.filters.amountMin !== '') f.amountMin = form.filters.amountMin;
-    if (form.filters.amountMax !== '') f.amountMax = form.filters.amountMax;
+    if (form.filters.movementMode === 'classified') {
+      f.movementMode = 'classified';
+      f.movementTypes = form.filters.movementTypes;
+      if (form.filters.movementAmountMin !== '') f.movementAmountMin = form.filters.movementAmountMin;
+      if (form.filters.movementAmountMax !== '') f.movementAmountMax = form.filters.movementAmountMax;
+    } else {
+      if (form.filters.amountMin !== '') f.amountMin = form.filters.amountMin;
+      if (form.filters.amountMax !== '') f.amountMax = form.filters.amountMax;
+    }
     if (form.filters.onlyConfirmed) f.onlyConfirmed = true;
     return f;
   };
@@ -148,6 +165,10 @@ export default function CreateSubscriptionPage() {
     }
     if (!form.name || !form.webhook_url) {
       setError('Name and webhook URL are required');
+      return;
+    }
+    if (form.filters.movementMode === 'classified' && form.filters.movementTypes.length === 0) {
+      setError('Select at least one classified movement type.');
       return;
     }
 
@@ -192,6 +213,7 @@ export default function CreateSubscriptionPage() {
     subscriptionQuota.count >= subscriptionQuota.limit;
 
   const subscriptionQuotaLoading = !isEdit && subscriptionQuota === null;
+  const classified = form.filters.movementMode === 'classified';
 
   return (
     <Box>
@@ -269,6 +291,69 @@ export default function CreateSubscriptionPage() {
                   helperText="Account that signed the transaction. For marketplaces, prefer Address so user buy calls are included (buy lists the wallet as sender, contract as receiver)."
                 />
               </Grid>
+              {form.filters.tokenIdentifier && (
+                <>
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Token movement delivery</InputLabel>
+                      <Select
+                        value={form.filters.movementMode}
+                        label="Token movement delivery"
+                        onChange={(e) => {
+                          const enabled = e.target.value === 'classified';
+                          setForm({
+                            ...form,
+                            filters: {
+                              ...form.filters,
+                              movementMode: e.target.value,
+                              movementTypes: enabled && !form.filters.movementTypes.length ? ['BUY', 'SELL'] : form.filters.movementTypes,
+                              movementAmountMin: enabled && !form.filters.movementAmountMin ? form.filters.amountMin : form.filters.movementAmountMin,
+                              movementAmountMax: enabled && !form.filters.movementAmountMax ? form.filters.amountMax : form.filters.movementAmountMax,
+                              onlyConfirmed: enabled ? true : form.filters.onlyConfirmed,
+                            },
+                          });
+                        }}
+                      >
+                        <MenuItem value="">Raw activity</MenuItem>
+                        <MenuItem value="classified">Classified movement</MenuItem>
+                      </Select>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                        Raw activity delivers each token row. Classified delivery sends one BUY, SELL, or OTHER result per original transaction.
+                      </Typography>
+                    </FormControl>
+                  </Grid>
+                  {classified && (
+                    <>
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth required>
+                          <InputLabel>Movement types</InputLabel>
+                          <Select multiple value={form.filters.movementTypes} label="Movement types"
+                            onChange={(e) => setForm({ ...form, filters: { ...form.filters, movementTypes: e.target.value } })}
+                            renderValue={(selected) => selected.join(', ')}
+                          >
+                            {['BUY', 'SELL', 'OTHER'].map((type) => (
+                              <MenuItem key={type} value={type}><Checkbox checked={form.filters.movementTypes.includes(type)} /><ListItemText primary={type} /></MenuItem>
+                            ))}
+                          </Select>
+                          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                            Buy and sell are high-confidence swaps; Other includes non-trade token movement.
+                          </Typography>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField label="Classified amount min" value={form.filters.movementAmountMin}
+                          onChange={(e) => setForm({ ...form, filters: { ...form.filters, movementAmountMin: e.target.value } })}
+                          helperText="Minimum absolute net target-token movement across the original transaction." />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField label="Classified amount max" value={form.filters.movementAmountMax}
+                          onChange={(e) => setForm({ ...form, filters: { ...form.filters, movementAmountMax: e.target.value } })}
+                          helperText="Maximum absolute net target-token movement across the original transaction." />
+                      </Grid>
+                    </>
+                  )}
+                </>
+              )}
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Receiver"
@@ -382,6 +467,7 @@ export default function CreateSubscriptionPage() {
                 />
               </Grid>
               <Grid item xs={12} md={6}>
+                {!classified && (
                 <TextField
                   label="Amount min"
                   value={form.filters.amountMin}
@@ -393,8 +479,10 @@ export default function CreateSubscriptionPage() {
                       : 'Minimum native EGLD on this row (human-readable, 18 decimals). Example: 0.35. Set Token identifier (e.g. REWARD-cf6eac) for ESDT amount filters.'
                   }
                 />
+                )}
               </Grid>
               <Grid item xs={12} md={6}>
+                {!classified && (
                 <TextField
                   label="Amount max"
                   value={form.filters.amountMax}
@@ -406,6 +494,7 @@ export default function CreateSubscriptionPage() {
                       : 'Maximum native EGLD on this row. Set Token identifier to apply min/max to that ESDT instead of EGLD.'
                   }
                 />
+                )}
               </Grid>
 
               <Grid item xs={12}>
@@ -419,6 +508,7 @@ export default function CreateSubscriptionPage() {
                   control={
                     <Switch
                       checked={!!form.filters.onlyConfirmed}
+                      disabled={classified}
                       onChange={(e) =>
                         setForm({ ...form, filters: { ...form.filters, onlyConfirmed: e.target.checked } })
                       }
@@ -427,8 +517,9 @@ export default function CreateSubscriptionPage() {
                   label="Only confirmed (1 webhook per tx)"
                 />
                 <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
-                  ON: Skip pending, only deliver when on-chain (success/fail). Best for payments and asset flows.
-                  OFF: Deliver pending + confirmed. May get 2 webhooks per tx.
+                  {classified
+                    ? 'Classified movements always wait for confirmation so the complete original transaction can be evaluated.'
+                    : 'ON: Skip pending, only deliver when on-chain (success/fail). OFF: Deliver pending + confirmed.'}
                 </Typography>
               </Grid>
 
