@@ -145,11 +145,12 @@ export default function CreateSubscriptionPage() {
       f.movementTypes = form.filters.movementTypes;
       if (form.filters.movementAmountMin !== '') f.movementAmountMin = form.filters.movementAmountMin;
       if (form.filters.movementAmountMax !== '') f.movementAmountMax = form.filters.movementAmountMax;
+      f.onlyConfirmed = true;
     } else {
       if (form.filters.amountMin !== '') f.amountMin = form.filters.amountMin;
       if (form.filters.amountMax !== '') f.amountMax = form.filters.amountMax;
+      if (form.filters.onlyConfirmed) f.onlyConfirmed = true;
     }
-    if (form.filters.onlyConfirmed) f.onlyConfirmed = true;
     return f;
   };
 

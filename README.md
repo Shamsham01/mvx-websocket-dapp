@@ -5,10 +5,13 @@ A real-time WebSocket subscription service for MultiversX blockchain transfers w
 ## Features
 - User authentication with MultiversX wallet (xPortal/sdk-dapp)
 - Custom filter configuration (sender, receiver, function, token, address)
+- Optional classified fungible-token movement delivery (BUY / SELL / OTHER) across the original root transaction
 - Webhook URL management
 - Real-time WebSocket subscriptions to MultiversX API
 - Automatic forwarding of filtered transfers to user webhooks
 - Subscription management (create/update/delete)
+
+See `USAGE.md` for filter examples, including classified movement subscriptions.
 
 ## Architecture
 - **Frontend**: React + TypeScript + sdk-dapp

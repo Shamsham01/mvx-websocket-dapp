@@ -741,6 +741,7 @@ class WebSocketService {
     this.subscriptions.clear();
     this.payloadToSubscriptionIds.clear();
     this.deliveredKeys.clear();
+    this.rootTransactionCache.clear();
   }
 }
 

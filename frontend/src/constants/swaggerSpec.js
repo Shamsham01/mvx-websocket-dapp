@@ -48,7 +48,11 @@ const swaggerSpec = {
           matchTopLevelOnly: true,
           transactionType: 'SmartContractResult',
           tokenIdentifier: 'REWARD-cf6eac',
-          collectionIdentifier: 'EMP-897b49'
+          collectionIdentifier: 'EMP-897b49',
+          movementMode: 'classified',
+          movementTypes: ['BUY', 'SELL'],
+          movementAmountMin: '10000',
+          onlyConfirmed: true
         }
       },
       Subscription: {
