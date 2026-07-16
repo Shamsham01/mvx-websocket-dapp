@@ -109,11 +109,32 @@ function collectTransactionFamilyFunctions(rootTransaction) {
   return values;
 }
 
+function collectRootFunctions(rootTransaction) {
+  return [
+    rootTransaction?.function,
+    rootTransaction?.action?.name,
+    rootTransaction?.action?.arguments?.functionName,
+    rootTransaction?.action?.arguments?.function,
+  ]
+    .filter(Boolean)
+    .map((value) => String(value).toLowerCase());
+}
+
 function detectTransactionIntent(rootTransaction) {
-  const functions = collectTransactionFamilyFunctions(rootTransaction);
-  const text = [...functions].join(' ');
-  if (/(liquidity|stake|unstake|farm|deposit|withdraw|claim)/.test(text)) return 'NON_TRADE';
-  if (/(swap|exchange|trade|route|aggregator)/.test(text)) return 'SWAP';
+  const rootFunctions = collectRootFunctions(rootTransaction);
+  const familyFunctions = [...collectTransactionFamilyFunctions(rootTransaction)];
+  const rootText = rootFunctions.join(' ');
+  const familyText = familyFunctions.join(' ');
+
+  // Only explicit user-facing/root non-trade actions should override swap evidence.
+  // Internal router helpers such as depositSwapFees, unwrapEgld and ESDTLocalBurn
+  // must not turn an otherwise clear swap into NON_TRADE.
+  const explicitRootNonTrade =
+    /(?:^|\s)(?:addliquidity|removeliquidity|enterfarm|exitfarm|stake|unstake|claimrewards?|deposit|withdraw)(?:$|\s)/;
+  if (explicitRootNonTrade.test(rootText)) return 'NON_TRADE';
+
+  // Swap evidence often exists only in nested DEX/router results.
+  if (/(swap|exchange|trade|route|aggregator)/.test(familyText)) return 'SWAP';
   return 'UNKNOWN';
 }
 
@@ -240,6 +261,7 @@ module.exports = {
   extractCanonicalAssetFlows,
   calculateNetAssetDeltas,
   collectTransactionFamilyFunctions,
+  collectRootFunctions,
   detectTransactionIntent,
   classifyMovement,
   formatAtomicAmount,
