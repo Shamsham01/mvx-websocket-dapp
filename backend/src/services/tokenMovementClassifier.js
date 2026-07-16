@@ -35,10 +35,32 @@ function assetFromOperation(operation) {
   return identifier || null;
 }
 
+function flowSignature(flow) {
+  return `${flow.asset}|${flow.from}|${flow.to}|${flow.amount.toString()}`;
+}
+
+function operationToBoundaryFlow(operation, rootTransaction, initiator) {
+  const asset = assetFromOperation(operation);
+  if (!asset) return null;
+  const from = operation.sender || operation.from || rootTransaction.sender;
+  const to = operation.receiver || operation.to || rootTransaction.receiver;
+  const amount = safeBigInt(operation.value ?? operation.amount);
+  if (!amount || (from !== initiator && to !== initiator)) return null;
+  const decimals =
+    asset === 'EGLD'
+      ? 18
+      : Number.isInteger(Number(operation.decimals))
+        ? Number(operation.decimals)
+        : 0;
+  return { asset, from, to, amount, decimals };
+}
+
 /**
- * Canonical operation legs are authoritative. We deliberately do not add
- * results/logs when operations exist because API data frequently represents
- * the same movement in both places.
+ * ESDT operations are authoritative. Native EGLD boundary movements are
+ * supplemented from the root value and successful SCR results because
+ * composable-task transactions often begin operations only after EGLD has
+ * already moved from the initiating wallet into a composer contract.
+ * Exact native legs already present in operations are deduplicated.
  */
 function extractCanonicalAssetFlows(rootTransaction, initiator = resolveInitiator(rootTransaction)) {
   if (!initiator) return [];
@@ -54,23 +76,35 @@ function extractCanonicalAssetFlows(rootTransaction, initiator = resolveInitiato
         type: transfer.type,
       }));
 
-  return source
-    .map((operation) => {
-      const asset = assetFromOperation(operation);
-      if (!asset) return null;
-      const from = operation.sender || operation.from || rootTransaction.sender;
-      const to = operation.receiver || operation.to || rootTransaction.receiver;
-      const amount = safeBigInt(operation.value ?? operation.amount);
-      if (!amount || (from !== initiator && to !== initiator)) return null;
-      const decimals =
-        asset === 'EGLD'
-          ? 18
-          : Number.isInteger(Number(operation.decimals))
-            ? Number(operation.decimals)
-            : 0;
-      return { asset, from, to, amount, decimals };
-    })
+  const flows = source
+    .map((operation) => operationToBoundaryFlow(operation, rootTransaction, initiator))
     .filter(Boolean);
+  const seen = new Set(flows.map(flowSignature));
+
+  const addNativeBoundaryFlow = (node) => {
+    const amount = safeBigInt(node?.value);
+    const from = node?.sender;
+    const to = node?.receiver;
+    if (!amount || !from || !to || (from !== initiator && to !== initiator)) return;
+    const flow = { asset: 'EGLD', from, to, amount, decimals: 18 };
+    const signature = flowSignature(flow);
+    if (seen.has(signature)) return;
+    seen.add(signature);
+    flows.push(flow);
+  };
+
+  addNativeBoundaryFlow(rootTransaction);
+
+  const visitResults = (results) => {
+    for (const result of Array.isArray(results) ? results : []) {
+      const status = normalizeValue(result?.status);
+      if (!status || status === 'success') addNativeBoundaryFlow(result);
+      visitResults(result?.results);
+    }
+  };
+  visitResults(rootTransaction?.results);
+
+  return flows;
 }
 
 function calculateNetAssetDeltas(flows, initiator) {
