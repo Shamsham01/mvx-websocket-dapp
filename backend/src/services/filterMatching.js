@@ -137,6 +137,21 @@ function transactionTypeMatches(transfer, wantType) {
 }
 
 /**
+ * Marketplace listing families often emit a follow-up SCR where the contract calls itself
+ * (sender === receiver). Those rows share function/address filters with the real transfer SCR
+ * but are not a distinct user listing — skip them at match time.
+ */
+function isScrSelfCall(transfer) {
+  const sender = normalizeValue(transfer?.sender);
+  const receiver = normalizeValue(transfer?.receiver);
+  if (!sender || !receiver || sender !== receiver) return false;
+
+  if (transfer?.originalTxHash) return true;
+  const rowType = normalizeValue(transfer?.type);
+  return rowType === 'smartcontractresult' || rowType === 'unsigned';
+}
+
+/**
  * Parse human-readable amount to atomic units (wei-style).
  * @param {string|number} value - e.g. "100", "0.35"
  * @param {number} decimals - token decimals from chain (EGLD = 18)
@@ -269,6 +284,11 @@ function matchesRowFilters(transfer, filters) {
   const sender = normalizeValue(transfer?.sender);
   const receiver = normalizeValue(transfer?.receiver);
   const relayer = normalizeValue(transfer?.relayer);
+
+  // Drop contract→contract async self-calls (e.g. XOXNO listing continuation SCR).
+  if (isScrSelfCall(transfer)) {
+    return false;
+  }
 
   if (normalizedFilters.transactionType) {
     if (!transactionTypeMatches(transfer, normalizedFilters.transactionType)) {
@@ -457,6 +477,24 @@ function matchesFilters(transfer, filters, options = {}) {
   return true;
 }
 
+/**
+ * Dedupe key for raw (non-classified) webhook delivery.
+ * Collection SCR subscriptions use root tx + collection so multi-SCR listing
+ * families (user→marketplace transfer + marketplace self-call) produce one webhook.
+ */
+function buildRawDeliveryDedupeKey(subscription, transfer, filters) {
+  const status = transfer?.status ?? '';
+  const txId = transfer?.txHash || transfer?.hash || 'unknown';
+  const rootHash = transfer?.originalTxHash || null;
+  const collection = filters?.collectionIdentifier;
+  const subId = subscription?.id ?? 'unknown';
+
+  if (rootHash && collection) {
+    return `raw|${subId}|${rootHash}|collection|${normalizeValue(collection)}`;
+  }
+  return `raw|${subId}|${txId}|${status}`;
+}
+
 module.exports = {
   normalizeValue,
   transferFunctionName,
@@ -472,7 +510,9 @@ module.exports = {
   resolveAmountDecimals,
   resolveApiTokenFilter,
   transactionTypeMatches,
+  isScrSelfCall,
   matchesRowFilters,
   requiresParentAssetContext,
   matchesFilters,
+  buildRawDeliveryDedupeKey,
 };

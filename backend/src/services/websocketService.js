@@ -404,7 +404,11 @@ class WebSocketService {
     for (const subscription of match.subscriptionsToDeliver) {
       const filters = parseJson(subscription.filters) || {};
       if (filters.movementMode !== 'classified') {
-        raw.push({ subscription, transfer });
+        raw.push({
+          subscription,
+          transfer,
+          dedupeKey: filterMatching.buildRawDeliveryDedupeKey(subscription, transfer, filters),
+        });
         continue;
       }
       // Classified movements are confirmed-only, even for malformed legacy rows.
@@ -631,14 +635,11 @@ class WebSocketService {
           continue;
         }
 
-        const rawDedupeKey = `${txId}|${transfer?.status ?? ''}`;
-        if (raw.length > 0 && !this.deliveredKeys.has(rawDedupeKey)) {
-          const claimed = await database.tryClaimDelivered(rawDedupeKey);
-          if (claimed) {
-            const results = await Promise.allSettled(raw.map((plan) => webhookService.deliverWebhook(plan.subscription, plan.transfer)));
-            if (results.some((result) => result.status === 'fulfilled' && result.value?.success)) this.recordDelivered(rawDedupeKey);
-            else await database.releaseDeliveredClaim(rawDedupeKey);
-          }
+        for (const plan of raw) {
+          if (this.hasDelivered(plan.dedupeKey) || !(await database.tryClaimDelivered(plan.dedupeKey))) continue;
+          const result = await webhookService.deliverWebhook(plan.subscription, plan.transfer);
+          if (result?.success) this.recordDelivered(plan.dedupeKey);
+          else await database.releaseDeliveredClaim(plan.dedupeKey);
         }
         for (const plan of classified) {
           if (this.hasDelivered(plan.dedupeKey) || !(await database.tryClaimDelivered(plan.dedupeKey))) continue;

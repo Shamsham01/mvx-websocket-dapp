@@ -73,12 +73,11 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
         const plans = await wsService.buildDeliveryPlansForTransfer(
           confirmedTransfer, subscriptions, network, { parentTransaction: parentHint, rootTransaction: parentHint }
         );
-        const deliveredTxHash = originalTransfer?.txHash || originalTransfer?.hash || txHash;
-        const rawDedupeKey = `${deliveredTxHash}|${txStatus}`;
-        if (plans.raw.length > 0 && !wsService.hasDelivered(rawDedupeKey) && await database.tryClaimDelivered(rawDedupeKey)) {
-          const results = await Promise.allSettled(plans.raw.map((plan) => webhookService.deliverWebhook(plan.subscription, plan.transfer)));
-          if (results.some((result) => result.status === 'fulfilled' && result.value?.success)) wsService.recordDelivered(rawDedupeKey);
-          else await database.releaseDeliveredClaim(rawDedupeKey);
+        for (const plan of plans.raw) {
+          if (wsService.hasDelivered(plan.dedupeKey) || !(await database.tryClaimDelivered(plan.dedupeKey))) continue;
+          const result = await webhookService.deliverWebhook(plan.subscription, plan.transfer);
+          if (result?.success) wsService.recordDelivered(plan.dedupeKey);
+          else await database.releaseDeliveredClaim(plan.dedupeKey);
         }
         for (const plan of plans.classified) {
           if (wsService.hasDelivered(plan.dedupeKey) || !(await database.tryClaimDelivered(plan.dedupeKey))) continue;

@@ -364,3 +364,105 @@ describe('subscription filter matching', () => {
     ).toBe(false);
   });
 });
+
+describe('SCR self-call exclusion and collection root dedupe keys', () => {
+  const xoxnoMarketplace = 'erd1qqqqqqqqqqqqqpgq6wegs2xkypfpync8mn2sa5cmpqjlvrhwz5nqgepyg8';
+  const lister = 'erd1h9hm0gnkgn888ly9zgnswsjajprk2fkszndwhm28xkcay66xnnesdyzcs6';
+  const rootTxHash = 'b383bf5a59adadd14c1b335ecebe6be53c0daec8ba24172fc06ddeb403448a6d';
+  const transferScrHash = 'b0723c15a85f888d84c3f66a2fcb73c288dbbee75218048f727407190e135e69';
+  const selfCallScrHash = '93c30caaec43fc3ce56274a966fe59497632d5a5d5ec1358e48b0ce6e22dc0e4';
+
+  const listingFilters = {
+    address: xoxnoMarketplace,
+    function: 'listing',
+    onlyConfirmed: true,
+    transactionType: 'SmartContractResult',
+    matchTopLevelOnly: true,
+    collectionIdentifier: 'PITTZ-1a4c2d',
+  };
+
+  const listingParent = {
+    txHash: rootTxHash,
+    sender: lister,
+    receiver: lister,
+    function: 'listing',
+    type: 'normal',
+    status: 'success',
+    operations: [
+      {
+        action: 'transfer',
+        type: 'nft',
+        esdtType: 'NonFungibleESDT',
+        collection: 'PITTZ-1a4c2d',
+        identifier: 'PITTZ-1a4c2d-0dc6',
+        sender: lister,
+        receiver: xoxnoMarketplace,
+        value: '1',
+      },
+    ],
+  };
+
+  const transferScr = {
+    txHash: transferScrHash,
+    hash: transferScrHash,
+    type: 'SmartContractResult',
+    function: 'listing',
+    sender: lister,
+    receiver: xoxnoMarketplace,
+    originalTxHash: rootTxHash,
+    status: 'success',
+    action: { category: 'scCall', name: 'MultiESDTNFTTransfer' },
+  };
+
+  const selfCallScr = {
+    txHash: selfCallScrHash,
+    hash: selfCallScrHash,
+    type: 'SmartContractResult',
+    function: 'listing',
+    sender: xoxnoMarketplace,
+    receiver: xoxnoMarketplace,
+    originalTxHash: rootTxHash,
+    status: 'success',
+    action: { category: 'scCall', name: 'listing' },
+  };
+
+  it('detects marketplace self-call SCRs', () => {
+    expect(filterMatching.isScrSelfCall(selfCallScr)).toBe(true);
+    expect(filterMatching.isScrSelfCall(transferScr)).toBe(false);
+  });
+
+  it('rejects marketplace self-call listing SCR even with parent collection', () => {
+    expect(filterMatching.matchesRowFilters(selfCallScr, listingFilters)).toBe(false);
+    expect(
+      filterMatching.matchesFilters(selfCallScr, listingFilters, {
+        parentTransaction: listingParent,
+      })
+    ).toBe(false);
+  });
+
+  it('matches user→marketplace listing SCR with parent collection context', () => {
+    expect(
+      filterMatching.matchesFilters(transferScr, listingFilters, {
+        parentTransaction: listingParent,
+      })
+    ).toBe(true);
+  });
+
+  it('uses root+collection dedupe key for collection SCR deliveries', () => {
+    const sub = { id: 31 };
+    expect(filterMatching.buildRawDeliveryDedupeKey(sub, transferScr, listingFilters)).toBe(
+      `raw|31|${rootTxHash}|collection|pittz-1a4c2d`
+    );
+    expect(filterMatching.buildRawDeliveryDedupeKey(sub, selfCallScr, listingFilters)).toBe(
+      `raw|31|${rootTxHash}|collection|pittz-1a4c2d`
+    );
+  });
+
+  it('keeps per-SCR dedupe when collectionIdentifier is absent', () => {
+    const sub = { id: 31 };
+    const filters = { address: xoxnoMarketplace, function: 'listing' };
+    expect(filterMatching.buildRawDeliveryDedupeKey(sub, transferScr, filters)).toBe(
+      `raw|31|${transferScrHash}|success`
+    );
+  });
+});

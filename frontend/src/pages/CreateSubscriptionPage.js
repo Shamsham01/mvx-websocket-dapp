@@ -292,69 +292,6 @@ export default function CreateSubscriptionPage() {
                   helperText="Account that signed the transaction. For marketplaces, prefer Address so user buy calls are included (buy lists the wallet as sender, contract as receiver)."
                 />
               </Grid>
-              {form.filters.tokenIdentifier && (
-                <>
-                  <Grid item xs={12} md={6}>
-                    <FormControl fullWidth>
-                      <InputLabel>Token movement delivery</InputLabel>
-                      <Select
-                        value={form.filters.movementMode}
-                        label="Token movement delivery"
-                        onChange={(e) => {
-                          const enabled = e.target.value === 'classified';
-                          setForm({
-                            ...form,
-                            filters: {
-                              ...form.filters,
-                              movementMode: e.target.value,
-                              movementTypes: enabled && !form.filters.movementTypes.length ? ['BUY', 'SELL'] : form.filters.movementTypes,
-                              movementAmountMin: enabled && !form.filters.movementAmountMin ? form.filters.amountMin : form.filters.movementAmountMin,
-                              movementAmountMax: enabled && !form.filters.movementAmountMax ? form.filters.amountMax : form.filters.movementAmountMax,
-                              onlyConfirmed: enabled ? true : form.filters.onlyConfirmed,
-                            },
-                          });
-                        }}
-                      >
-                        <MenuItem value="">Raw activity</MenuItem>
-                        <MenuItem value="classified">Classified movement</MenuItem>
-                      </Select>
-                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
-                        Raw activity delivers each token row. Classified delivery sends one BUY, SELL, or OTHER result per original transaction.
-                      </Typography>
-                    </FormControl>
-                  </Grid>
-                  {classified && (
-                    <>
-                      <Grid item xs={12} md={6}>
-                        <FormControl fullWidth required>
-                          <InputLabel>Movement types</InputLabel>
-                          <Select multiple value={form.filters.movementTypes} label="Movement types"
-                            onChange={(e) => setForm({ ...form, filters: { ...form.filters, movementTypes: e.target.value } })}
-                            renderValue={(selected) => selected.join(', ')}
-                          >
-                            {['BUY', 'SELL', 'OTHER'].map((type) => (
-                              <MenuItem key={type} value={type}><Checkbox checked={form.filters.movementTypes.includes(type)} /><ListItemText primary={type} /></MenuItem>
-                            ))}
-                          </Select>
-                          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
-                            Buy and sell are high-confidence swaps; Other includes non-trade token movement.
-                          </Typography>
-                        </FormControl>
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Classified amount min" value={form.filters.movementAmountMin}
-                          onChange={(e) => setForm({ ...form, filters: { ...form.filters, movementAmountMin: e.target.value } })}
-                          helperText="Minimum absolute net target-token movement across the original transaction." />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField label="Classified amount max" value={form.filters.movementAmountMax}
-                          onChange={(e) => setForm({ ...form, filters: { ...form.filters, movementAmountMax: e.target.value } })}
-                          helperText="Maximum absolute net target-token movement across the original transaction." />
-                      </Grid>
-                    </>
-                  )}
-                </>
-              )}
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Receiver"
@@ -467,6 +404,115 @@ export default function CreateSubscriptionPage() {
                   helperText="NFT collection (e.g. Empyreans EMP-897b49). Matches this row, or for SCRs the original parent transaction when the collection is only on originalTxHash."
                 />
               </Grid>
+              {form.filters.tokenIdentifier.trim() && (
+                <>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                      Token movement delivery
+                    </Typography>
+                    <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Choose how fungible token activity is delivered for this subscription.
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Delivery mode</InputLabel>
+                      <Select
+                        value={form.filters.movementMode}
+                        label="Delivery mode"
+                        onChange={(e) => {
+                          const enabled = e.target.value === 'classified';
+                          setForm({
+                            ...form,
+                            filters: {
+                              ...form.filters,
+                              movementMode: e.target.value,
+                              movementTypes:
+                                enabled && !form.filters.movementTypes.length
+                                  ? ['BUY', 'SELL']
+                                  : form.filters.movementTypes,
+                              movementAmountMin:
+                                enabled && !form.filters.movementAmountMin
+                                  ? form.filters.amountMin
+                                  : form.filters.movementAmountMin,
+                              movementAmountMax:
+                                enabled && !form.filters.movementAmountMax
+                                  ? form.filters.amountMax
+                                  : form.filters.movementAmountMax,
+                              onlyConfirmed: enabled ? true : form.filters.onlyConfirmed,
+                            },
+                          });
+                        }}
+                      >
+                        <MenuItem value="">Raw token activity</MenuItem>
+                        <MenuItem value="classified">Classified movement</MenuItem>
+                      </Select>
+                      <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                        Raw activity delivers each token transfer/SCR row. Classified movement resolves the original
+                        transaction and delivers one BUY, SELL, or OTHER event from the initiating wallet net movement.
+                      </Typography>
+                    </FormControl>
+                  </Grid>
+                  {classified && (
+                    <>
+                      <Grid item xs={12} md={6}>
+                        <FormControl fullWidth required>
+                          <InputLabel>Movement types</InputLabel>
+                          <Select
+                            multiple
+                            value={form.filters.movementTypes}
+                            label="Movement types"
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                filters: { ...form.filters, movementTypes: e.target.value },
+                              })
+                            }
+                            renderValue={(selected) => selected.join(', ')}
+                          >
+                            {['BUY', 'SELL', 'OTHER'].map((type) => (
+                              <MenuItem key={type} value={type}>
+                                <Checkbox checked={form.filters.movementTypes.includes(type)} />
+                                <ListItemText primary={type} />
+                              </MenuItem>
+                            ))}
+                          </Select>
+                          <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 0.75 }}>
+                            Buy: received target token in a swap. Sell: spent target token in a swap. Other: non-trade
+                            target-token movement (transfer, stake, liquidity, etc.).
+                          </Typography>
+                        </FormControl>
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Minimum classified token amount"
+                          value={form.filters.movementAmountMin}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              filters: { ...form.filters, movementAmountMin: e.target.value },
+                            })
+                          }
+                          helperText="Applied to the absolute net target-token movement across the complete original transaction."
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          label="Maximum classified token amount"
+                          value={form.filters.movementAmountMax}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              filters: { ...form.filters, movementAmountMax: e.target.value },
+                            })
+                          }
+                          helperText="Applied to the absolute net target-token movement across the complete original transaction."
+                        />
+                      </Grid>
+                    </>
+                  )}
+                </>
+              )}
               <Grid item xs={12} md={6}>
                 {!classified && (
                 <TextField
