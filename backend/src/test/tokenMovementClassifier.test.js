@@ -214,6 +214,58 @@ describe('token movement classifier', () => {
     expect(movement.subtype).toBe('non_trade');
   });
 
+  test('treats a direct user-to-user ESDTTransfer with a gas refund SCR as a plain transfer', async () => {
+    // Real mainnet tx 197d9166...: erd15wm sends REWARD-cf6eac to erd13n0.
+    // The only SCR is the cross-shard unspent-gas refund (EGLD, data "@ok")
+    // returning to the sender. It must not become a counter-asset that turns
+    // the transfer into an inferred sell.
+    const gasRefundData = Buffer.from('@6f6b', 'utf8').toString('base64');
+    const movement = await classifyTokenMovement({
+      triggerTransfer: {
+        txHash: '197d9166d940e45f1a15c2d12d3f8b7096125b209fc694d61ba7dcd7c6bee3cd',
+      },
+      rootTransaction: {
+        hash: '197d9166d940e45f1a15c2d12d3f8b7096125b209fc694d61ba7dcd7c6bee3cd',
+        sender: trader,
+        receiver: 'erd1recipient',
+        function: 'ESDTTransfer',
+        value: '0',
+        fee: '130000000000000',
+        status: 'success',
+        operations: [
+          {
+            type: 'esdt',
+            sender: trader,
+            receiver: 'erd1recipient',
+            identifier: 'REWARD-cf6eac',
+            value: '5000000000000',
+            decimals: 8,
+          },
+          { type: 'log', action: 'writeLog', sender: 'erd1recipient', receiver: trader },
+        ],
+        results: [
+          {
+            sender: 'erd1recipient',
+            receiver: trader,
+            value: '1720000000000',
+            data: gasRefundData,
+            function: 'transfer',
+            status: 'success',
+          },
+        ],
+      },
+      targetTokenIdentifier: 'REWARD-cf6eac',
+      tokenDecimals: 8,
+      network: 'mainnet',
+    });
+
+    expect(movement.type).toBe('OTHER');
+    expect(movement.subtype).toBe('transfer');
+    expect(movement.counterAssets).toEqual([]);
+    expect(movement.targetToken.direction).toBe('SPENT');
+    expect(movement.targetToken.amount).toBe('50000');
+  });
+
   test('formats atomics and aggregates deltas exactly with BigInt', () => {
     expect(formatAtomicAmount('100000000', 8)).toBe('1');
     const deltas = calculateNetAssetDeltas(

@@ -18,6 +18,27 @@ function safeBigInt(value) {
   }
 }
 
+/**
+ * Smart-contract result SCRs that only carry a return code (e.g. the unspent
+ * gas refund, whose data is "@6f6b" == "@ok") begin with "@". Their EGLD value
+ * is protocol bookkeeping, not a user-intended payment leg. Counting them as a
+ * boundary flow makes a plain user-to-user ESDTTransfer look like a swap: the
+ * token is "spent" while the refunded EGLD looks "received". These must never
+ * contribute counter-asset movements. Real trade proceeds arrive as ESDT/EGLD
+ * operations, which remain authoritative.
+ */
+function isReturnCodeResult(result) {
+  const data = result?.data;
+  if (!data) return false;
+  const raw = String(data);
+  if (raw.startsWith('@')) return true;
+  try {
+    return Buffer.from(raw, 'base64').toString('utf8').startsWith('@');
+  } catch {
+    return false;
+  }
+}
+
 function isNonFungibleOperation(operation) {
   const type = normalizeValue(operation?.type);
   if (!type) return false;
@@ -98,7 +119,9 @@ function extractCanonicalAssetFlows(rootTransaction, initiator = resolveInitiato
   const visitResults = (results) => {
     for (const result of Array.isArray(results) ? results : []) {
       const status = normalizeValue(result?.status);
-      if (!status || status === 'success') addNativeBoundaryFlow(result);
+      if ((!status || status === 'success') && !isReturnCodeResult(result)) {
+        addNativeBoundaryFlow(result);
+      }
       visitResults(result?.results);
     }
   };
@@ -292,6 +315,7 @@ async function classifyTokenMovement({
 module.exports = {
   resolveRootTxHash,
   resolveInitiator,
+  isReturnCodeResult,
   extractCanonicalAssetFlows,
   calculateNetAssetDeltas,
   collectTransactionFamilyFunctions,
