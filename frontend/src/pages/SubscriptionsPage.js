@@ -8,6 +8,7 @@ import {
   FormControlLabel,
   IconButton,
   Skeleton,
+  Stack,
   Switch,
   Table,
   TableBody,
@@ -33,6 +34,28 @@ import CopyableField from '../components/ui/CopyableField';
 import SubscriptionAnalyticsSection from '../components/dashboard/SubscriptionAnalyticsSection';
 import { useNotify } from '../context/NotificationContext';
 import { DEFAULT_MAX_SUBSCRIPTIONS_PER_USER } from '../constants/subscriptionLimits';
+import {
+  getSubscriptionTypeMeta,
+  inferSubscriptionType,
+} from '../constants/subscriptionTypes';
+
+function subscriptionAssetCaption(filters = {}) {
+  if (filters.collectionIdentifier) return filters.collectionIdentifier;
+  if (filters.tokenIdentifier) {
+    if (filters.movementMode === 'classified') {
+      const types = (filters.movementTypes || []).join(' + ') || 'classified';
+      return `${filters.tokenIdentifier} · ${types}`;
+    }
+    return filters.tokenIdentifier;
+  }
+  if (filters.egldOnly) return 'EGLD only';
+  if (filters.address) {
+    const a = String(filters.address);
+    return a.length > 18 ? `${a.slice(0, 10)}…${a.slice(-6)}` : a;
+  }
+  if (filters.function) return filters.function;
+  return '';
+}
 
 export default function SubscriptionsPage() {
   const { user, loading } = useAuth();
@@ -86,7 +109,7 @@ export default function SubscriptionsPage() {
     <Box>
       <PageHeader
         title="Subscriptions"
-        description="Manage webhook subscriptions, filters, and target networks."
+        description="Manage what you watch on MultiversX and where webhooks are delivered."
         actions={
           <Tooltip
             title={
@@ -149,6 +172,7 @@ export default function SubscriptionsPage() {
               <TableHead>
                 <TableRow>
                   <TableCell>Name</TableCell>
+                  <TableCell>Type</TableCell>
                   <TableCell>Webhook</TableCell>
                   <TableCell>Network</TableCell>
                   <TableCell>Status</TableCell>
@@ -167,13 +191,24 @@ export default function SubscriptionsPage() {
                   >
                     <TableCell>
                       <Typography variant="body2">{sub.name}</Typography>
-                      {sub.filters?.tokenIdentifier && (
+                      {!!subscriptionAssetCaption(sub.filters) && (
                         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                          {sub.filters?.movementMode === 'classified'
-                            ? `Classified: ${(sub.filters.movementTypes || []).join(' + ')}`
-                            : 'Raw activity'}
+                          {subscriptionAssetCaption(sub.filters)}
                         </Typography>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
+                        <Chip
+                          size="small"
+                          label={getSubscriptionTypeMeta(inferSubscriptionType(sub.filters)).shortLabel}
+                          variant="outlined"
+                          color="primary"
+                        />
+                        {sub.filters?.onlyConfirmed || sub.filters?.movementMode === 'classified' ? (
+                          <Chip size="small" label="Confirmed" variant="outlined" />
+                        ) : null}
+                      </Stack>
                     </TableCell>
                     <TableCell sx={{ maxWidth: 320 }}>
                       <CopyableField value={sub.webhook_url} onCopy={() => notify('Webhook URL copied', 'success')} />
