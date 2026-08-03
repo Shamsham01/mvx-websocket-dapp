@@ -332,6 +332,12 @@ class WebSocketService {
     return !hasOps && !hasRes;
   }
 
+  /** True when operations are missing — webhook consumers need these for NFT sales. */
+  needsOperationsEnrichment(transfer) {
+    const ops = transfer?.operations;
+    return !Array.isArray(ops) || ops.length === 0;
+  }
+
   mergeApiTxIntoTransfer(wsTransfer, apiTx) {
     if (!apiTx || typeof apiTx !== 'object') return wsTransfer;
     const merged = {
@@ -365,6 +371,47 @@ class WebSocketService {
       `Transfer ${txId}: pre-enriched for matching (operations=${enriched?.operations?.length || 0}, type=${enriched?.type})`
     );
     return enriched;
+  }
+
+  /**
+   * Re-fetch the SCR/transfer by its own hash before webhook delivery.
+   * Confirmation polling uses the parent hash for status, so the original WS SCR
+   * row is often still thin (operations: []). By the time status is final the
+   * indexer usually has ops/logs — retry briefly if not.
+   */
+  async enrichTransferForDelivery(transfer, network, options = {}) {
+    if (ENRICH_DISABLED || !transfer) return transfer;
+    if (!this.needsOperationsEnrichment(transfer)) return transfer;
+
+    const retries = Number.isInteger(options.retries) ? options.retries : 2;
+    const delayMs = Number.isInteger(options.delayMs) ? options.delayMs : 1500;
+    const preserveStatus = transfer.status;
+    let current = transfer;
+    const txId = current?.txHash || current?.hash;
+
+    if (!txId || txId === 'unknown') return transfer;
+
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      const apiTx = await this.fetchTransactionDetails(network, txId);
+      if (apiTx) {
+        current = this.mergeApiTxIntoTransfer(current, apiTx);
+        if (preserveStatus) current.status = preserveStatus;
+        if (!this.needsOperationsEnrichment(current)) {
+          logger.debug(
+            `Transfer ${txId}: enriched for delivery (operations=${current.operations.length}, attempt=${attempt + 1})`
+          );
+          return current;
+        }
+      }
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+
+    logger.warn(
+      `Transfer ${txId}: delivery enrich still missing operations after ${retries + 1} attempt(s)`
+    );
+    return current;
   }
 
   async fetchTransactionDetails(network, txHash) {

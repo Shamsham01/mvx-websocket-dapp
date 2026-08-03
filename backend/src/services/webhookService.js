@@ -18,6 +18,11 @@ class WebhookService {
     };
   }
 
+  hasOperations(transferData) {
+    const operations = transferData?.operations;
+    return Array.isArray(operations) && operations.length > 0;
+  }
+
   shouldRestoreParentOperations(subscription, transferData, options = {}) {
     if (options.movement) return false;
 
@@ -26,8 +31,21 @@ class WebhookService {
     if (!filters.collectionIdentifier) return false;
     if (!transferData?.originalTxHash) return false;
 
-    const operations = transferData?.operations;
-    return !Array.isArray(operations) || operations.length === 0;
+    return !this.hasOperations(transferData);
+  }
+
+  cacheParentOperations(cacheKey, operations) {
+    // Never cache empty results — indexer lag would pin thin payloads for the TTL.
+    if (!Array.isArray(operations) || operations.length === 0) return;
+
+    this.parentOperationsCache.set(cacheKey, {
+      operations,
+      expiresAt: Date.now() + PARENT_OPERATIONS_CACHE_TTL_MS
+    });
+    if (this.parentOperationsCache.size > PARENT_OPERATIONS_CACHE_MAX) {
+      const oldestKey = this.parentOperationsCache.keys().next().value;
+      this.parentOperationsCache.delete(oldestKey);
+    }
   }
 
   async fetchParentOperations(network, originalTxHash) {
@@ -49,15 +67,7 @@ class WebhookService {
         ? response.data.operations
         : [];
 
-      this.parentOperationsCache.set(cacheKey, {
-        operations,
-        expiresAt: Date.now() + PARENT_OPERATIONS_CACHE_TTL_MS
-      });
-      if (this.parentOperationsCache.size > PARENT_OPERATIONS_CACHE_MAX) {
-        const oldestKey = this.parentOperationsCache.keys().next().value;
-        this.parentOperationsCache.delete(oldestKey);
-      }
-
+      this.cacheParentOperations(cacheKey, operations);
       return operations;
     } catch (error) {
       logger.warn(
@@ -67,25 +77,76 @@ class WebhookService {
     }
   }
 
-  async prepareTransferForDelivery(subscription, transferData, options = {}) {
-    if (!this.shouldRestoreParentOperations(subscription, transferData, options)) {
-      return transferData;
+  /**
+   * Prefer SCR-level REST details (ops + logs + price) over parent-ops paste.
+   * Used when confirmation/WS enrich left a thin payload.
+   */
+  async fetchScrDetails(network, scrHash) {
+    const apiUrl = this.apiEndpoints[network];
+    if (!apiUrl || !scrHash || scrHash === 'unknown') return null;
+
+    try {
+      const response = await axios.get(`${apiUrl}/transactions/${scrHash}`, {
+        timeout: 15000
+      });
+      return response.data || null;
+    } catch (error) {
+      logger.warn(`SCR enrich for delivery failed for ${scrHash}: ${error.message}`);
+      return null;
     }
+  }
+
+  async prepareTransferForDelivery(subscription, transferData, options = {}) {
+    if (options.movement) return transferData;
 
     const network = subscription?.network || 'mainnet';
+    let transfer = transferData;
+
+    // Prefer enriching the SCR itself so payloads match GET /transactions/{scrHash}
+    // (NFT name, writeLog, logs, gas*, price) — not just parent buy operations.
+    if (!this.hasOperations(transfer)) {
+      const scrHash = transfer?.txHash || transfer?.hash;
+      const apiTx = await this.fetchScrDetails(network, scrHash);
+      if (apiTx && this.hasOperations(apiTx)) {
+        const preserveStatus = transfer.status;
+        const preserveType = transfer.type;
+        transfer = {
+          ...transfer,
+          ...apiTx,
+          txHash: transfer.txHash || apiTx.txHash,
+          hash: transfer.hash || apiTx.hash || apiTx.txHash,
+        };
+        if (preserveStatus) transfer.status = preserveStatus;
+        // Keep WebSocket SmartContractResult typing when REST returns "unsigned".
+        if (
+          typeof preserveType === 'string' &&
+          preserveType.toLowerCase() === 'smartcontractresult'
+        ) {
+          transfer.type = preserveType;
+        }
+        logger.debug(
+          `Enriched SCR ${scrHash} for webhook delivery (operations=${transfer.operations.length})`
+        );
+      }
+    }
+
+    if (!this.shouldRestoreParentOperations(subscription, transfer, options)) {
+      return transfer;
+    }
+
     const operations = await this.fetchParentOperations(
       network,
-      transferData.originalTxHash
+      transfer.originalTxHash
     );
     if (!Array.isArray(operations) || operations.length === 0) {
-      return transferData;
+      return transfer;
     }
 
     logger.debug(
-      `Restored ${operations.length} parent operation(s) for SCR ${transferData?.txHash || transferData?.hash || 'unknown'} from ${transferData.originalTxHash}`
+      `Restored ${operations.length} parent operation(s) for SCR ${transfer?.txHash || transfer?.hash || 'unknown'} from ${transfer.originalTxHash}`
     );
     return {
-      ...transferData,
+      ...transfer,
       operations
     };
   }

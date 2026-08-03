@@ -19,8 +19,20 @@ const parentOperations = [
   },
 ];
 
+const scrOperations = [
+  {
+    action: 'transfer',
+    type: 'nft',
+    collection: 'EMP-897b49',
+    identifier: 'EMP-897b49-214a',
+    name: 'Empyrean #123',
+    value: '1',
+  },
+];
+
 const scrTransfer = {
   hash: 'scr-hash',
+  txHash: 'scr-hash',
   type: 'SmartContractResult',
   function: 'auctionToken',
   originalTxHash: 'parent-hash',
@@ -47,8 +59,15 @@ describe('raw SCR parent operations webhook enrichment', () => {
     axios.post.mockResolvedValue({ status: 200, data: { ok: true } });
   });
 
-  it('restores parent operations for raw collection-filtered SCR delivery', async () => {
-    axios.get.mockResolvedValue({ data: { operations: parentOperations } });
+  it('enriches thin SCR from GET /transactions/{scrHash} before delivery', async () => {
+    axios.get.mockResolvedValue({
+      data: {
+        operations: scrOperations,
+        logs: { events: [{ identifier: 'ESDTNFTTransfer' }] },
+        price: 2.5,
+        gasPrice: 1000000000,
+      },
+    });
 
     await webhookService.deliverWebhook(
       subscription({ collectionIdentifier: 'EMP-897b49' }),
@@ -56,6 +75,44 @@ describe('raw SCR parent operations webhook enrichment', () => {
     );
 
     expect(axios.get).toHaveBeenCalledTimes(1);
+    expect(axios.get).toHaveBeenCalledWith(
+      'https://api.multiversx.com/transactions/scr-hash',
+      { timeout: 15000 }
+    );
+
+    const payload = axios.post.mock.calls[0][1];
+    expect(payload.transfer).toEqual(
+      expect.objectContaining({
+        hash: 'scr-hash',
+        originalTxHash: 'parent-hash',
+        type: 'SmartContractResult',
+        function: 'auctionToken',
+        operations: scrOperations,
+        price: 2.5,
+      })
+    );
+  });
+
+  it('falls back to parent operations when SCR enrich returns empty ops', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.endsWith('/scr-hash')) {
+        return Promise.resolve({ data: { operations: [] } });
+      }
+      if (url.endsWith('/parent-hash')) {
+        return Promise.resolve({ data: { operations: parentOperations } });
+      }
+      return Promise.reject(new Error(`unexpected url ${url}`));
+    });
+
+    await webhookService.deliverWebhook(
+      subscription({ collectionIdentifier: 'EMP-897b49' }),
+      scrTransfer
+    );
+
+    expect(axios.get).toHaveBeenCalledWith(
+      'https://api.multiversx.com/transactions/scr-hash',
+      { timeout: 15000 }
+    );
     expect(axios.get).toHaveBeenCalledWith(
       'https://api.multiversx.com/transactions/parent-hash',
       { timeout: 15000 }
@@ -109,7 +166,7 @@ describe('raw SCR parent operations webhook enrichment', () => {
     expect(axios.post.mock.calls[0][1].transfer.operations).toEqual(existingOperations);
   });
 
-  it('falls back to the original SCR when parent enrichment is unavailable', async () => {
+  it('falls back to the original SCR when enrichment is unavailable', async () => {
     axios.get.mockRejectedValue(new Error('API unavailable'));
 
     await webhookService.deliverWebhook(
@@ -118,18 +175,42 @@ describe('raw SCR parent operations webhook enrichment', () => {
     );
 
     expect(axios.post).toHaveBeenCalledTimes(1);
-    expect(axios.post.mock.calls[0][1].transfer).toBe(scrTransfer);
     expect(axios.post.mock.calls[0][1].transfer.operations).toEqual([]);
   });
 
-  it('caches parent operations across raw subscriptions for the same transaction', async () => {
-    axios.get.mockResolvedValue({ data: { operations: parentOperations } });
+  it('does not cache empty parent operations', async () => {
+    axios.get
+      .mockResolvedValueOnce({ data: { operations: [] } }) // SCR enrich
+      .mockResolvedValueOnce({ data: { operations: [] } }) // parent (empty — not cached)
+      .mockResolvedValueOnce({ data: { operations: [] } }) // SCR enrich (2nd delivery)
+      .mockResolvedValueOnce({ data: { operations: parentOperations } }); // parent now ready
+
     const sub = subscription({ collectionIdentifier: 'EMP-897b49' });
 
     await webhookService.deliverWebhook(sub, scrTransfer);
     await webhookService.deliverWebhook({ ...sub, id: 14 }, scrTransfer);
 
-    expect(axios.get).toHaveBeenCalledTimes(1);
+    expect(axios.get).toHaveBeenCalledTimes(4);
+    expect(axios.post.mock.calls[1][1].transfer.operations).toEqual(parentOperations);
+  });
+
+  it('caches non-empty parent operations across raw subscriptions', async () => {
+    axios.get.mockImplementation((url) => {
+      if (url.endsWith('/scr-hash')) {
+        return Promise.resolve({ data: { operations: [] } });
+      }
+      if (url.endsWith('/parent-hash')) {
+        return Promise.resolve({ data: { operations: parentOperations } });
+      }
+      return Promise.reject(new Error(`unexpected url ${url}`));
+    });
+    const sub = subscription({ collectionIdentifier: 'EMP-897b49' });
+
+    await webhookService.deliverWebhook(sub, scrTransfer);
+    await webhookService.deliverWebhook({ ...sub, id: 14 }, scrTransfer);
+
+    // SCR enrich twice + parent once (cached on second delivery)
+    expect(axios.get).toHaveBeenCalledTimes(3);
     expect(axios.post).toHaveBeenCalledTimes(2);
   });
 });

@@ -62,12 +62,21 @@ async function pollUntilConfirmed(txHash, originalTransfer, subscriptions, netwo
       if (txStatus === 'success' || txStatus === 'fail' || txStatus === 'invalid') {
         logger.info(`[subscription] confirmation poll tx ${txHash} final status=${txStatus} (attempt ${attempt})`);
 
-        const confirmedTransfer = {
+        // Poll uses parent hash (originalTxHash) for status. The payload is still the
+        // SCR row from the WebSocket, which is often thin (operations: []). Re-fetch
+        // the SCR itself so webhooks get ops/logs/price consistently.
+        let confirmedTransfer = {
           ...originalTransfer,
           status: txStatus,
           ...(response.data.gasUsed != null && { gasUsed: String(response.data.gasUsed) }),
           ...(response.data.timestamp != null && { timestamp: response.data.timestamp })
         };
+        if (typeof wsService.enrichTransferForDelivery === 'function') {
+          confirmedTransfer = await wsService.enrichTransferForDelivery(
+            confirmedTransfer,
+            network
+          );
+        }
 
         const parentHint = response.data && typeof response.data === 'object' ? response.data : null;
         const plans = await wsService.buildDeliveryPlansForTransfer(
