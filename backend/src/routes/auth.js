@@ -5,6 +5,7 @@ const database = require('../config/database');
 const logger = require('../utils/logger');
 const { NativeAuthServer } = require('@multiversx/sdk-native-auth-server');
 const { authenticate } = require('../middleware/authenticate');
+const logRetentionService = require('../services/logRetentionService');
 
 // Native Auth server for wallet signature verification
 const getNativeAuthServer = () => {
@@ -209,10 +210,10 @@ router.get('/dashboard-analytics', authenticate, async (req, res) => {
       FROM webhook_logs wl
       JOIN subscriptions s ON s.id = wl.subscription_id
       WHERE s.user_id = ?
-        AND wl.delivered_at >= NOW() - INTERVAL '45 days'
+        AND wl.delivered_at >= ?
       GROUP BY wl.subscription_id, s.name, DATE_TRUNC('day', wl.delivered_at)
       ORDER BY day ASC
-    `, [userId]);
+    `, [userId, logRetentionService.getCutoffDate()]);
 
     const totalWebhookCalls = webhookStats?.total_webhook_calls || 0;
     const successfulWebhookCalls = webhookStats?.successful_webhook_calls || 0;
@@ -223,6 +224,7 @@ router.get('/dashboard-analytics', authenticate, async (req, res) => {
 
     res.json({
       success: true,
+      retention_hours: logRetentionService.retentionHours,
       stats: {
         total_subscriptions: subscriptionStats?.total_subscriptions || 0,
         active_subscriptions: subscriptionStats?.active_subscriptions || 0,

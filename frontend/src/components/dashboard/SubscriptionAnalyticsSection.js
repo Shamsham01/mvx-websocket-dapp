@@ -105,6 +105,7 @@ export default function SubscriptionAnalyticsSection({ user }) {
   }, [user, fetchDashboard]);
 
   const stats = dashboard?.stats;
+  const retentionHours = dashboard?.retention_hours ?? 48;
   const subscriptionChartRows = dashboard?.charts?.subscriptions || [];
   const callsPerDay = dashboard?.charts?.calls_per_day || [];
   const selectedSubscription = subscriptionChartRows.find(
@@ -160,7 +161,7 @@ export default function SubscriptionAnalyticsSection({ user }) {
             <StatCard
               label="Total Webhook Calls"
               value={stats.total_webhook_calls ?? 0}
-              caption="All webhook deliveries recorded"
+              caption={`Deliveries from the last ${retentionHours} hours`}
               icon={<LinkRoundedIcon />}
             />
           ) : (
@@ -264,8 +265,8 @@ export default function SubscriptionAnalyticsSection({ user }) {
         title="Webhook Calls per Day"
         description={
           selectedSubscription
-            ? `Showing daily calls for ${truncateLabel(selectedSubscription.name, 48)}`
-            : 'Showing daily calls for all subscriptions'
+            ? `Daily calls for ${truncateLabel(selectedSubscription.name, 48)} over the last ${retentionHours} hours`
+            : `Daily calls for all subscriptions over the last ${retentionHours} hours`
         }
         sx={{ mt: 3 }}
       >

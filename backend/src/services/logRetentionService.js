@@ -1,27 +1,31 @@
 const logger = require('../utils/logger');
 const database = require('../config/database');
 
-const DEFAULT_RETENTION_DAYS = 7;
-const DEFAULT_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const DEFAULT_RETENTION_HOURS = 48;
+const DEFAULT_INTERVAL_MS = 60 * 60 * 1000;
 const BATCH_SIZE = 5000;
 
 class LogRetentionService {
   constructor() {
-    this.retentionDays = parseInt(process.env.WEBHOOK_LOG_RETENTION_DAYS, 10);
-    if (Number.isNaN(this.retentionDays)) {
-      this.retentionDays = DEFAULT_RETENTION_DAYS;
-    }
+    const parsedHours = parseInt(process.env.WEBHOOK_LOG_RETENTION_HOURS, 10);
+    this.retentionHours = Number.isNaN(parsedHours) ? DEFAULT_RETENTION_HOURS : parsedHours;
     this.intervalMs = parseInt(process.env.WEBHOOK_LOG_CLEANUP_INTERVAL_MS, 10) || DEFAULT_INTERVAL_MS;
     this.intervalId = null;
     this.isRunning = false;
+
+    if (process.env.WEBHOOK_LOG_RETENTION_DAYS !== undefined && process.env.WEBHOOK_LOG_RETENTION_HOURS === undefined) {
+      logger.warn(
+        'WEBHOOK_LOG_RETENTION_DAYS is ignored. Retention is controlled by WEBHOOK_LOG_RETENTION_HOURS (default 48).'
+      );
+    }
   }
 
   isEnabled() {
-    return this.retentionDays > 0;
+    return this.retentionHours > 0;
   }
 
   getCutoffDate() {
-    return new Date(Date.now() - this.retentionDays * 24 * 60 * 60 * 1000);
+    return new Date(Date.now() - this.retentionHours * 60 * 60 * 1000);
   }
 
   async deleteOlderThan(tableName, timestampColumn, cutoff) {
@@ -67,10 +71,10 @@ class LogRetentionService {
 
       if (webhookLogs > 0 || deliveredTransfers > 0) {
         logger.info(
-          `Data retention cleanup (${this.retentionDays} days): deleted ${webhookLogs} webhook_logs, ${deliveredTransfers} delivered_transfers`
+          `Data retention cleanup (${this.retentionHours} hours): deleted ${webhookLogs} webhook_logs, ${deliveredTransfers} delivered_transfers`
         );
       } else {
-        logger.debug(`Data retention cleanup: no rows older than ${this.retentionDays} days`);
+        logger.debug(`Data retention cleanup: no rows older than ${this.retentionHours} hours`);
       }
 
       return { webhookLogs, deliveredTransfers };
@@ -84,7 +88,7 @@ class LogRetentionService {
 
   startScheduledCleanup() {
     if (!this.isEnabled()) {
-      logger.info('Data retention disabled (WEBHOOK_LOG_RETENTION_DAYS <= 0)');
+      logger.info('Data retention disabled (WEBHOOK_LOG_RETENTION_HOURS <= 0)');
       return;
     }
 
@@ -104,8 +108,9 @@ class LogRetentionService {
       });
     }, this.intervalMs);
 
+    const everyMinutes = Math.max(1, Math.round(this.intervalMs / 60000));
     logger.info(
-      `Data retention enabled: ${this.retentionDays}-day retention for webhook_logs and delivered_transfers, cleanup every ${Math.round(this.intervalMs / 3600000)}h`
+      `Data retention enabled: ${this.retentionHours}-hour retention for webhook_logs and delivered_transfers, cleanup every ${everyMinutes} min`
     );
   }
 
