@@ -6,36 +6,58 @@ const logger = require('../utils/logger');
 const { NativeAuthServer } = require('@multiversx/sdk-native-auth-server');
 const { authenticate } = require('../middleware/authenticate');
 const logRetentionService = require('../services/logRetentionService');
+const { MemoryNativeAuthCache } = require('../services/nativeAuthCache');
+const { classifyNativeAuthError } = require('../services/nativeAuthErrors');
+const { validateNativeAuth } = require('../services/nativeAuthGate');
 
-// Native Auth server for wallet signature verification
-const getNativeAuthServer = () => {
-  const apiUrl =
-    process.env.MVX_NATIVE_AUTH_API ||
-    process.env.MVX_API_MAINNET ||
-    process.env.MVX_API_DEVNET ||
-    'https://api.multiversx.com';
-  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-  return new NativeAuthServer({
-    apiUrl,
-    acceptedOrigins: ['*', frontendUrl, 'http://localhost:3000', 'https://localhost:3000'],
-    maxExpirySeconds: 86400, // 24 hours
-  });
-};
+const nativeAuthCache = new MemoryNativeAuthCache();
+let nativeAuthServer;
+
+function getNativeAuthServer() {
+  if (!nativeAuthServer) {
+    const apiUrl =
+      process.env.MVX_NATIVE_AUTH_API ||
+      process.env.MVX_API_MAINNET ||
+      process.env.MVX_API_DEVNET ||
+      'https://api.multiversx.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    nativeAuthServer = new NativeAuthServer({
+      apiUrl,
+      acceptedOrigins: ['*', frontendUrl, 'http://localhost:3000', 'https://localhost:3000'],
+      maxExpirySeconds: 86400,
+      cache: nativeAuthCache,
+    });
+  }
+  return nativeAuthServer;
+}
+
+function sendClassified(res, classified) {
+  if (classified.retryAfter) {
+    res.set('Retry-After', classified.retryAfter);
+  }
+  return res.status(classified.status).json(classified.body);
+}
 
 // Login with MultiversX Native Auth (secure wallet signature)
 router.post('/login/native', async (req, res) => {
+  const { accessToken } = req.body;
+
+  if (!accessToken || typeof accessToken !== 'string') {
+    return res.status(400).json({ error: 'Access token is required', code: 'missing_token' });
+  }
+
+  let result;
   try {
-    const { accessToken } = req.body;
+    result = await validateNativeAuth(accessToken, (token) => getNativeAuthServer().validate(token));
+  } catch (error) {
+    const classified = classifyNativeAuthError(error);
+    logger.error(`Native Auth validation failed (${classified.body.code}, upstream ${classified.status})`);
+    return sendClassified(res, classified);
+  }
 
-    if (!accessToken) {
-      return res.status(400).json({ error: 'Access token is required' });
-    }
-
-    const nativeAuthServer = getNativeAuthServer();
-    const result = await nativeAuthServer.validate(accessToken);
+  try {
     const address = result.address;
 
-    // Create or update user
     let user = await database.get('SELECT * FROM users WHERE address = ?', [address]);
 
     if (!user) {
@@ -59,22 +81,27 @@ router.post('/login/native', async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
     );
 
-    res.json({
+    return res.json({
       success: true,
       token,
       user: { id: user.id, address: user.address },
     });
   } catch (error) {
-    logger.error('Native Auth login error:', error);
-    const status = error.name === 'NativeAuthOriginNotAcceptedError' ? 403 : 401;
-    res.status(status).json({
-      error: error.message || 'Invalid or expired access token',
-    });
+    logger.error('Native Auth session error');
+    return res.status(500).json({ error: 'Internal server error', code: 'internal_error' });
   }
 });
 
-// Login with MultiversX wallet signature (legacy - NOT verified, for dev only)
+// Legacy client-trusted login. Signature is not verified. Disabled in production.
 router.post('/login', async (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    logger.warn('Rejected legacy /api/auth/login in production');
+    return res.status(403).json({
+      error: 'Legacy wallet login is disabled. Authenticate with your wallet again.',
+      code: 'legacy_login_disabled',
+    });
+  }
+
   try {
     const { address, signature, message } = req.body;
 

@@ -35,9 +35,7 @@ import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceW
 import ArrowDropDownRoundedIcon from '@mui/icons-material/ArrowDropDownRounded';
 import { alpha, useTheme } from '@mui/material/styles';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useGetAccountInfo } from '@multiversx/sdk-dapp/out/react/account/useGetAccountInfo';
-import { useGetLoginInfo } from '@multiversx/sdk-dapp/out/react/loginInfo/useGetLoginInfo';
-import { getAccountProvider } from '@multiversx/sdk-dapp/out/providers/helpers/accountProvider';
+import AuthRecovery from '../auth/AuthRecovery';
 import { useAuth } from '../../context/AuthContext';
 import { initWalletConnect, openWalletConnect } from '../../utils/walletConnect';
 import { COMMUNITY, DOCS, MEDIA } from '../../constants/links';
@@ -93,51 +91,37 @@ export default function AppShell({ children }) {
   const isMobile = useMediaQuery(muiTheme.breakpoints.down('md'));
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = React.useState(false);
-  const [isAuthenticating, setIsAuthenticating] = React.useState(false);
   const [communityAnchor, setCommunityAnchor] = React.useState(null);
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const { user, logout, loginWithNativeAuth } = useAuth();
-  const { account } = useGetAccountInfo();
-  const loginInfo = useGetLoginInfo();
-  const nativeAuthToken = loginInfo?.tokenLogin?.nativeAuthToken;
+  const { user, logout, isAuthenticating, authError, retryNativeAuth } = useAuth();
 
   const isLandingPage = pathname === '/';
 
-  initWalletConnect();
-
   React.useEffect(() => {
-    if (user || !account?.address || !nativeAuthToken || isAuthenticating) {
-      return;
-    }
-    const authenticate = async () => {
-      setIsAuthenticating(true);
-      try {
-        await loginWithNativeAuth(nativeAuthToken);
-        if (pathname === '/login') {
-          navigate('/dashboard');
-        }
-      } catch (_) {
-        // User can retry by reconnecting wallet.
-      } finally {
-        setIsAuthenticating(false);
-      }
-    };
-    authenticate();
-  }, [account?.address, nativeAuthToken, user, loginWithNativeAuth, navigate, pathname, isAuthenticating]);
+    initWalletConnect();
+  }, []);
 
   const handleLogout = async () => {
-    try {
-      const provider = getAccountProvider();
-      if (provider && typeof provider.logout === 'function') {
-        await provider.logout();
-      }
-    } catch (_) {
-      // Wallet may already be disconnected.
-    }
     await logout();
     navigate('/');
   };
+
+  const handleResetWallet = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const authRecovery = !user && pathname !== '/login' && (authError || isAuthenticating) ? (
+    <Box sx={{ mb: 2 }}>
+      <AuthRecovery
+        error={authError}
+        isAuthenticating={isAuthenticating}
+        onRetry={retryNativeAuth}
+        onDisconnect={handleResetWallet}
+      />
+    </Box>
+  ) : null;
 
   const walletButtons = user ? (
     <>
@@ -420,6 +404,9 @@ export default function AppShell({ children }) {
 
         <Box component="main" id="main-content" tabIndex={-1}>
           <Toolbar />
+          {authRecovery && (
+            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2 }}>{authRecovery}</Box>
+          )}
           {children}
         </Box>
       </Box>
@@ -562,6 +549,7 @@ export default function AppShell({ children }) {
       >
         <Toolbar />
         <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 } }}>
+          {authRecovery}
           {children}
         </Container>
       </Box>

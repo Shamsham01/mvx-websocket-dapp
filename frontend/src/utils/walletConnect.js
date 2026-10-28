@@ -18,6 +18,7 @@ const allowedProviders = hasWalletConnectProjectId
 
 let unlockPanelManager;
 
+// Single UnlockPanelManager for the app. Login and shell must not call init again.
 export function initWalletConnect() {
   if (!unlockPanelManager) {
     unlockPanelManager = UnlockPanelManager.init({
@@ -29,5 +30,5 @@ export function initWalletConnect() {
 }
 
 export function openWalletConnect() {
-  unlockPanelManager?.openUnlockPanel();
+  initWalletConnect().openUnlockPanel();
 }
