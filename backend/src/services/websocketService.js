@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { io } = require('socket.io-client');
 const axios = require('axios');
 const logger = require('../utils/logger');
@@ -40,6 +41,31 @@ const MVX_WS_MAX_SUBSCRIPTIONS_PER_SOCKET = Math.min(
  */
 function payloadKey(payload) {
   return JSON.stringify(payload);
+}
+
+/** Same filter on two networks must not share one registration set. */
+function payloadGroupKey(network, key) {
+  return JSON.stringify([network, key]);
+}
+
+function payloadIdentifier(key) {
+  return crypto.createHash('sha256').update(String(key)).digest('hex').slice(0, 12);
+}
+
+function safeSubscriptionError(error) {
+  if (typeof error === 'string') return error.slice(0, 300);
+  if (error && typeof error.message === 'string') return error.message.slice(0, 300);
+  try {
+    const text = JSON.stringify(error);
+    return text ? text.slice(0, 300) : 'unknown subscription error';
+  } catch (_) {
+    return 'unknown subscription error';
+  }
+}
+
+/** Connected sockets can take a non-volatile emit. Disconnected emits fill sendBuffer. */
+function socketIsConnected(socket) {
+  return !!(socket && socket.connected === true);
 }
 
 class WebSocketService {
@@ -109,11 +135,18 @@ class WebSocketService {
       network,
       shardIndex,
       socket,
-      payloadKeys: new Set()
+      payloadKeys: new Set(),
+      sessionId: 0,
+      registrations: new Map(),
+      loggedErrors: new Set()
     };
 
     socket.on('connect', () => {
-      logger.info(`WebSocket shard ${shardIndex} connected to ${network}`);
+      shard.sessionId += 1;
+      shard.loggedErrors.clear();
+      logger.info(
+        `WebSocket shard ${shardIndex} connected to ${network} (session ${shard.sessionId})`
+      );
       this.resubscribeShard(shard);
     });
 
@@ -127,8 +160,7 @@ class WebSocketService {
     });
 
     socket.on('error', (errorData) => {
-      const errMsg = errorData?.message ?? (typeof errorData === 'string' ? errorData : JSON.stringify(errorData));
-      logger.error(`WebSocket shard ${shardIndex} server error for ${network}: ${errMsg}`);
+      this.handleShardError(shard, errorData);
     });
 
     socket.on('customTransferUpdate', async (data) => {
@@ -158,15 +190,111 @@ class WebSocketService {
     return this.createShard(network);
   }
 
+  /**
+   * Ask the server to register one filter for this connection session.
+   * Nothing is emitted while disconnected: Socket.IO would buffer that packet
+   * and flush it before the connect listener, duplicating resubscribeShard().
+   * A connected socket always uses a normal emit. If the transport is not
+   * writable, Socket.IO keeps the packet on the engine write buffer and
+   * flushes it on drain. Volatile emits are not used; those are discarded.
+   * The state stays "requested" only after that emit. A missing ack is left
+   * as requested and is not resent on this session, because a second join
+   * still counts toward the 10-subscription cap. NestJS returns
+   * `{ status: 'success' }` as an ack when the room join works. Failures
+   * arrive on the `error` event (`pattern`, `data`, `error`).
+   */
+  emitSubscribe(shard, payload, key) {
+    if (!socketIsConnected(shard.socket)) return false;
+    const current = shard.registrations.get(key);
+    if (current && current.sessionId === shard.sessionId) return false;
+
+    const sessionId = shard.sessionId;
+    shard.registrations.set(key, { state: 'requested', sessionId });
+    shard.socket.emit('subscribeCustomTransfers', payload, (response) => {
+      const registration = shard.registrations.get(key);
+      if (!registration || registration.sessionId !== sessionId) return;
+      if (response && response.status === 'success') {
+        registration.state = 'confirmed';
+        logger.info(
+          `WebSocket shard ${shard.shardIndex} subscription confirmed on ${shard.network} payloadId=${payloadIdentifier(key)}`
+        );
+        return;
+      }
+      if (response && (response.error || response.status === 'error')) {
+        registration.state = 'rejected';
+        this.logSubscriptionRejection(
+          shard,
+          'subscribeCustomTransfers',
+          key,
+          response.error || response
+        );
+      }
+    });
+    logger.info(
+      `WebSocket shard ${shard.shardIndex} subscription requested on ${shard.network} payloadId=${payloadIdentifier(key)} session=${sessionId}`
+    );
+    return true;
+  }
+
+  emitUnsubscribe(shard, payload, key) {
+    shard.registrations.delete(key);
+    if (!socketIsConnected(shard.socket)) return false;
+    shard.socket.emit('unsubscribeCustomTransfers', payload);
+    return true;
+  }
+
+  logSubscriptionRejection(shard, pattern, key, error) {
+    const payloadId = key ? payloadIdentifier(key) : 'unknown';
+    const message = safeSubscriptionError(error);
+    const dedupe = `${shard.sessionId}|${pattern}|${payloadId}|${message}`;
+    if (shard.loggedErrors.has(dedupe)) return;
+    shard.loggedErrors.add(dedupe);
+    logger.error(
+      `WebSocket shard ${shard.shardIndex} subscription rejected on ${shard.network} pattern=${pattern} payloadId=${payloadId}: ${message}`
+    );
+  }
+
+  handleShardError(shard, errorData) {
+    const pattern = errorData && typeof errorData === 'object' ? errorData.pattern : null;
+    const data = errorData && typeof errorData === 'object' ? errorData.data : null;
+    if (pattern && data && typeof data === 'object') {
+      let key = null;
+      try {
+        key = payloadKey(data);
+      } catch (_) {
+        key = null;
+      }
+      if (key && shard.registrations.has(key)) {
+        const registration = shard.registrations.get(key);
+        if (registration && registration.sessionId === shard.sessionId) {
+          registration.state = 'rejected';
+        }
+      }
+      this.logSubscriptionRejection(
+        shard,
+        pattern,
+        key,
+        errorData.error != null ? errorData.error : errorData
+      );
+      return;
+    }
+
+    const errMsg = errorData?.message ?? (typeof errorData === 'string' ? errorData : safeSubscriptionError(errorData));
+    logger.error(
+      `WebSocket shard ${shard.shardIndex} server error for ${shard.network}: ${errMsg}`
+    );
+  }
+
   resubscribeShard(shard) {
     try {
       if (shard.payloadKeys.size === 0) return;
+      let requested = 0;
       for (const key of shard.payloadKeys) {
         const payload = JSON.parse(key);
-        shard.socket.emit('subscribeCustomTransfers', payload);
+        if (this.emitSubscribe(shard, payload, key)) requested += 1;
       }
       logger.info(
-        `Re-subscribed shard ${shard.shardIndex} on ${shard.network}: ${shard.payloadKeys.size} payload(s)`
+        `Re-subscribed shard ${shard.shardIndex} on ${shard.network}: ${requested} requested, ${shard.payloadKeys.size} desired`
       );
     } catch (error) {
       logger.error(`Failed to re-subscribe shard ${shard.shardIndex} (${shard.network}):`, error.message);
@@ -241,27 +369,28 @@ class WebSocketService {
       }
 
       const key = payloadKey(payload);
-      const existing = this.payloadToSubscriptionIds.get(key);
+      const group = payloadGroupKey(network, key);
+      const existing = this.payloadToSubscriptionIds.get(group);
       const isFirstForPayload = !existing || existing.size === 0;
 
       let shard;
       if (isFirstForPayload) {
         shard = await this.acquireShardWithCapacity(network);
-        this.payloadToSubscriptionIds.set(key, new Set([subscriptionId]));
+        this.payloadToSubscriptionIds.set(group, new Set([subscriptionId]));
         shard.payloadKeys.add(key);
-        shard.socket.emit('subscribeCustomTransfers', payload);
+        this.emitSubscribe(shard, payload, key);
         logger.info(
-          `Creating subscription ${subscriptionId} (first for payload, shard ${shard.shardIndex}), emitting subscribeCustomTransfers`
+          `Creating subscription ${subscriptionId} (first for payload, shard ${shard.shardIndex})`
         );
       } else {
         existing.add(subscriptionId);
         shard = this.findShardForPayload(network, key);
         if (!shard) {
-          logger.error(`Missing shard for payload ${key}; recovering with new MVX subscribe`);
+          logger.error(`Missing shard for payload on ${network}; recovering with a new socket`);
           shard = await this.acquireShardWithCapacity(network);
           if (!shard.payloadKeys.has(key)) {
             shard.payloadKeys.add(key);
-            shard.socket.emit('subscribeCustomTransfers', payload);
+            this.emitSubscribe(shard, payload, key);
           }
         }
         logger.info(`Creating subscription ${subscriptionId} (merged with existing payload, ${existing.size} total)`);
@@ -288,17 +417,18 @@ class WebSocketService {
         return { success: false, message: 'Subscription not found' };
       }
 
-      const { shard, payload } = subscription;
+      const { shard, payload, network } = subscription;
       const key = payloadKey(payload);
-      const ids = this.payloadToSubscriptionIds.get(key);
+      const group = payloadGroupKey(network, key);
+      const ids = this.payloadToSubscriptionIds.get(group);
       if (ids) {
         ids.delete(subscriptionId);
         if (ids.size === 0) {
-          this.payloadToSubscriptionIds.delete(key);
-          shard.socket.emit('unsubscribeCustomTransfers', payload);
+          this.payloadToSubscriptionIds.delete(group);
           shard.payloadKeys.delete(key);
-          this.pruneEmptyShard(subscription.network, shard);
-          logger.info(`Removed subscription ${subscriptionId} (last for payload), emitting unsubscribeCustomTransfers`);
+          this.emitUnsubscribe(shard, payload, key);
+          this.pruneEmptyShard(network, shard);
+          logger.info(`Removed subscription ${subscriptionId} (last for payload)`);
         } else {
           logger.info(`Removed subscription ${subscriptionId} (${ids.size} subscription(s) still using payload)`);
         }
