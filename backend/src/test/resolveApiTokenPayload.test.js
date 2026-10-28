@@ -34,13 +34,13 @@ describe('token-only subscribeCustomTransfers payload', () => {
     const emit = jest.fn();
     const on = jest.fn();
     const disconnect = jest.fn();
-    io.mockReturnValue({ emit, on, disconnect });
+    io.mockReturnValue({ emit, on, disconnect, connected: true });
 
     await websocketService.createSubscription(42, { tokenIdentifier: 'REWARD-cf6eac' }, 'mainnet');
 
     expect(emit).toHaveBeenCalledWith('subscribeCustomTransfers', {
       token: 'REWARD-cf6eac',
-    });
+    }, expect.any(Function));
 
     const stored = websocketService.subscriptions.get(42);
     expect(stored.payload).toEqual({ token: 'REWARD-cf6eac' });
@@ -50,20 +50,20 @@ describe('token-only subscribeCustomTransfers payload', () => {
     const emit = jest.fn();
     const on = jest.fn();
     const disconnect = jest.fn();
-    io.mockReturnValue({ emit, on, disconnect });
+    io.mockReturnValue({ emit, on, disconnect, connected: true });
 
     await websocketService.createSubscription(43, { egldOnly: true }, 'mainnet');
 
     expect(emit).toHaveBeenCalledWith('subscribeCustomTransfers', {
       token: 'EGLD',
-    });
+    }, expect.any(Function));
   });
 
   it('shares one MultiversX payload across duplicate tokenIdentifier subscriptions', async () => {
     const emit = jest.fn();
     const on = jest.fn();
     const disconnect = jest.fn();
-    io.mockReturnValue({ emit, on, disconnect });
+    io.mockReturnValue({ emit, on, disconnect, connected: true });
 
     await websocketService.createSubscription(50, { tokenIdentifier: 'REWARD-cf6eac' }, 'mainnet');
     await websocketService.createSubscription(51, { tokenIdentifier: 'REWARD-cf6eac' }, 'mainnet');
