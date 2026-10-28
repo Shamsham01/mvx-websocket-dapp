@@ -9,6 +9,7 @@ const logRetentionService = require('../services/logRetentionService');
 const { MemoryNativeAuthCache } = require('../services/nativeAuthCache');
 const { classifyNativeAuthError } = require('../services/nativeAuthErrors');
 const { validateNativeAuth } = require('../services/nativeAuthGate');
+const { buildAcceptedOrigins } = require('../services/nativeAuthOrigins');
 
 const nativeAuthCache = new MemoryNativeAuthCache();
 let nativeAuthServer;
@@ -20,15 +21,27 @@ function getNativeAuthServer() {
       process.env.MVX_API_MAINNET ||
       process.env.MVX_API_DEVNET ||
       'https://api.multiversx.com';
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const acceptedOrigins = buildAcceptedOrigins();
+    if (acceptedOrigins.length === 0) {
+      logger.error(
+        'Native Auth origin allowlist is empty. Set FRONTEND_URL to the exact dApp origin. Wildcard origins are not accepted.'
+      );
+      const error = new Error('Native Auth accepted origins are not configured');
+      error.code = 'native_auth_origins_unconfigured';
+      throw error;
+    }
     nativeAuthServer = new NativeAuthServer({
       apiUrl,
-      acceptedOrigins: ['*', frontendUrl, 'http://localhost:3000', 'https://localhost:3000'],
+      acceptedOrigins,
       maxExpirySeconds: 86400,
       cache: nativeAuthCache,
     });
   }
   return nativeAuthServer;
+}
+
+function resetNativeAuthServerForTests() {
+  nativeAuthServer = null;
 }
 
 function sendClassified(res, classified) {
@@ -272,3 +285,4 @@ router.get('/dashboard-analytics', authenticate, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.resetNativeAuthServerForTests = resetNativeAuthServerForTests;

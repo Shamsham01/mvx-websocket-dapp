@@ -63,6 +63,14 @@ function isManagedMvxUrl(url) {
   }
 }
 
+function pathOf(url) {
+  try {
+    return new URL(url).pathname;
+  } catch (_) {
+    return 'unknown';
+  }
+}
+
 function priorityFor(url) {
   try {
     const path = new URL(url).pathname;
@@ -379,6 +387,9 @@ function installMvxApiGuard(instance = axios, options = {}) {
       const release = await scheduler.acquire(priorityFor(url));
       config.__mvxRelease = release;
     } catch (error) {
+      if (error?.code === 'MVX_QUEUE_TIMEOUT') {
+        logger.warn(`MVX API queue timeout ${pathOf(url)}: ${error.message}`);
+      }
       settleInflight(config, error);
       throw error;
     }
@@ -440,7 +451,7 @@ function installMvxApiGuard(instance = axios, options = {}) {
   };
   instance.__mvxGuard = guard;
   logger.info(
-    `MVX API guard installed (maxRps=${maxRps}, concurrency=${maxConcurrency}, maxRetries=${maxRetries})`
+    `MVX API guard installed (maxRps=${maxRps}, concurrency=${maxConcurrency}, maxRetries=${maxRetries}, queueWaitMs=${maxQueueWaitMs}, maxQueue=${maxQueue})`
   );
   return guard;
 }

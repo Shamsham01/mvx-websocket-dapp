@@ -18,6 +18,7 @@ jest.mock('@multiversx/sdk-native-auth-server', () => {
 });
 
 const {
+  NativeAuthServer,
   NativeAuthInvalidSignatureError,
   NativeAuthTokenExpiredError,
   NativeAuthOriginNotAcceptedError,
@@ -46,9 +47,11 @@ describe('POST /api/auth/login/native', () => {
 
   beforeEach(() => {
     resetNativeAuthGateForTests();
+    authRoutes.resetNativeAuthServerForTests();
     database.get.mockReset();
     database.run.mockReset();
     global.__nativeValidate = jest.fn();
+    NativeAuthServer.mockClear();
     app = buildApp();
   });
 
@@ -176,6 +179,57 @@ describe('POST /api/auth/login/native', () => {
     expect(first.body.token).toEqual(expect.any(String));
     expect(second.status).toBe(200);
     expect(global.__nativeValidate).toHaveBeenCalledTimes(1);
+  });
+
+  it('configures an explicit production origin and drops wildcard entries', async () => {
+    const previousEnv = process.env.NODE_ENV;
+    const previousUrl = process.env.FRONTEND_URL;
+    const previousExtra = process.env.NATIVE_AUTH_ACCEPTED_ORIGINS;
+    process.env.NODE_ENV = 'production';
+    process.env.FRONTEND_URL = 'https://makex-web3.com';
+    process.env.NATIVE_AUTH_ACCEPTED_ORIGINS = '*,https://*.preview.example';
+    authRoutes.resetNativeAuthServerForTests();
+    NativeAuthServer.mockClear();
+    global.__nativeValidate.mockRejectedValue(new NativeAuthInvalidSignatureError());
+    try {
+      const res = await request(app).post('/api/auth/login/native').send({ accessToken: ACCESS_TOKEN });
+      expect(res.status).toBe(401);
+      expect(NativeAuthServer).toHaveBeenCalledTimes(1);
+      expect(NativeAuthServer.mock.calls[0][0].acceptedOrigins).toEqual(['https://makex-web3.com']);
+      expect(JSON.stringify(NativeAuthServer.mock.calls[0][0].acceptedOrigins)).not.toContain('*');
+    } finally {
+      process.env.NODE_ENV = previousEnv;
+      if (previousUrl == null) delete process.env.FRONTEND_URL;
+      else process.env.FRONTEND_URL = previousUrl;
+      if (previousExtra == null) delete process.env.NATIVE_AUTH_ACCEPTED_ORIGINS;
+      else process.env.NATIVE_AUTH_ACCEPTED_ORIGINS = previousExtra;
+      authRoutes.resetNativeAuthServerForTests();
+    }
+  });
+
+  it('fails closed in production when no public origin is configured', async () => {
+    const previousEnv = process.env.NODE_ENV;
+    const previousUrl = process.env.FRONTEND_URL;
+    const previousExtra = process.env.NATIVE_AUTH_ACCEPTED_ORIGINS;
+    process.env.NODE_ENV = 'production';
+    delete process.env.FRONTEND_URL;
+    delete process.env.NATIVE_AUTH_ACCEPTED_ORIGINS;
+    authRoutes.resetNativeAuthServerForTests();
+    NativeAuthServer.mockClear();
+    try {
+      const res = await request(app).post('/api/auth/login/native').send({ accessToken: ACCESS_TOKEN });
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: 'Internal server error', code: 'internal_error' });
+      expect(NativeAuthServer).not.toHaveBeenCalled();
+      expect(global.__nativeValidate).not.toHaveBeenCalled();
+    } finally {
+      process.env.NODE_ENV = previousEnv;
+      if (previousUrl == null) delete process.env.FRONTEND_URL;
+      else process.env.FRONTEND_URL = previousUrl;
+      if (previousExtra == null) delete process.env.NATIVE_AUTH_ACCEPTED_ORIGINS;
+      else process.env.NATIVE_AUTH_ACCEPTED_ORIGINS = previousExtra;
+      authRoutes.resetNativeAuthServerForTests();
+    }
   });
 
   it('disables legacy login in production and leaves it unavailable as an auth bypass', async () => {

@@ -159,6 +159,58 @@ describe('mvxApiGuard', () => {
     uninstallMvxApiGuard(client);
   });
 
+  it('at one request per second keeps a queued confirmation read and does not delay a webhook', async () => {
+    let release;
+    const client = createClient((config) => {
+      const url = String(config.url);
+      if (url.includes('hooks.example')) {
+        return Promise.resolve({
+          data: { delivered: true },
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        });
+      }
+      if (url.endsWith('/transactions/hold')) {
+        return new Promise((resolve) => {
+          release = () => resolve({
+            data: { status: 'pending' },
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            config,
+          });
+        });
+      }
+      return Promise.resolve({
+        data: { status: 'success' },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config,
+      });
+    }, {
+      maxRps: 1,
+      maxConcurrency: 1,
+      maxQueueWaitMs: 2500,
+      maxQueue: 40,
+      maxRetries: 0,
+    });
+
+    const started = Date.now();
+    const holder = client.get('https://api.multiversx.com/transactions/hold');
+    const webhook = client.post('https://hooks.example/hook', { ok: true });
+    await expect(webhook).resolves.toMatchObject({ data: { delivered: true } });
+    expect(Date.now() - started).toBeLessThan(400);
+
+    const confirmation = client.get('https://api.multiversx.com/transactions/parent');
+    release();
+    await holder;
+    await expect(confirmation).resolves.toMatchObject({ data: { status: 'success' } });
+    uninstallMvxApiGuard(client);
+  });
+
   it('fails queued callers quickly and still delivers a non-MultiversX webhook', async () => {
     let release;
     let posts = 0;

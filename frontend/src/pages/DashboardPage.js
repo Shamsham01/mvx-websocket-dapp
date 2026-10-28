@@ -41,7 +41,7 @@ import SectionCard from '../components/ui/SectionCard';
 import StatCard from '../components/ui/StatCard';
 import ErrorState from '../components/ui/ErrorState';
 import { fetchRewardTokenDenominated, fetchUsageFeeTransfersPage } from '../services/mvxPublicApi';
-import { MAKEX_USAGE_FEE_ADDRESS, REWARD_TOKEN_ID, USDC_TOKEN_ID } from '../constants/mvx';
+import { MAKEX_USAGE_FEE_ADDRESS, REWARD_TOKEN_ID } from '../constants/mvx';
 import BillingPreferencesCard from '../components/dashboard/BillingPreferencesCard';
 import {
   aggregateByDay,

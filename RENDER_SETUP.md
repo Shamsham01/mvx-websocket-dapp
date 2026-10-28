@@ -145,14 +145,29 @@ Without `REACT_APP_API_URL`, the frontend will try to reach `http://localhost:30
 
 ## Wallet Login (Native Auth)
 
-For secure wallet login to work, ensure:
+Native Auth checks the origin embedded in the wallet token against an explicit allowlist. A value of `*` is not accepted, and neither are wildcard hosts. Localhost is added only when `NODE_ENV` is not `production`.
 
 | Key | Value | Notes |
 |-----|-------|-------|
-| `FRONTEND_URL` | Your Netlify URL | Required for CORS and Native Auth origin validation |
+| `FRONTEND_URL` | Exact browser origin, for production `https://makex-web3.com` | Required for CORS and Native Auth. No path and no trailing alias. If users also sign in from `www`, set that origin explicitly below. Do not guess it. |
+| `NATIVE_AUTH_ACCEPTED_ORIGINS` | Comma-separated exact origins | Optional. Use for a second real origin, such as a preview host that actually issues login tokens. Entries containing `*` are ignored. |
 | `MVX_API_MAINNET` | `https://api.multiversx.com` | Used for Native Auth token validation (mainnet default) |
 
-Native Auth validates that login tokens come from your frontend origin.
+Login returns HTTP 500 `internal_error` in production until `FRONTEND_URL` is a non-local origin. That is fail-closed, not a fallback to the legacy login route.
+
+## Public MultiversX API limit
+
+The backend throttles its own calls to `api.multiversx.com` inside each process (default 1 request/second, concurrency 1, queue wait 4 seconds, queue length 40). Customer webhook URLs are not throttled. A full or expired queue rejects that REST call with `MVX_QUEUE_TIMEOUT` and logs `MVX API queue timeout`. Confirmation polling retries that failure (default 6 attempts, 5 seconds apart) and still posts the webhook when a later read succeeds. Enrichment failures still deliver the payload the service already has.
+
+This limit is not shared across Render instances. Two instances on one egress IP can exceed the public API's 2 requests/second cap. Prefer one web instance, or a dedicated MultiversX API, before raising `MVX_API_MAX_RPS`.
+
+Search Render logs for:
+
+- `MVX API queue timeout` — a REST call waited too long or the in-process queue was full
+- `Confirmation poll gave up` — polling used its retries and did not deliver that transaction
+- `MVX API guard installed` — the active per-process budget
+
+Optional knobs: `MVX_API_MAX_RPS`, `MVX_API_MAX_CONCURRENCY`, `MVX_API_MAX_RETRIES`, `MVX_API_MAX_RETRY_WAIT_MS`, `MVX_API_MAX_QUEUE_WAIT_MS`, `MVX_API_MAX_QUEUE`.
 
 ---
 

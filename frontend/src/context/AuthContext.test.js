@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './AuthContext';
 import { clearNativeAuthSession, MVX_AUTH_BUSY_MESSAGE } from '../services/nativeAuthSession';
 
 const ADDRESS = 'erd1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5qu5k2';
+const ADDRESS_B = 'erd1qyu5wthldzr8wx5c9ucg8kjagg0jfs53s8nr3zpz3hypefsdd8ssycr6th';
 const TOKEN = 'native-token-1';
 
 jest.mock('@multiversx/sdk-dapp/out/react/account/useGetAccountInfo', () => ({
@@ -150,6 +151,23 @@ describe('AuthProvider login lifecycle', () => {
     global.__testWallet.token = TOKEN;
     view.rerender(<Tree />);
     await waitFor(() => expect(global.__authApi.loginWithNativeAuth).toHaveBeenCalledTimes(2));
+  });
+
+  it('replaces a restored session when the connected wallet is different', async () => {
+    localStorage.setItem('token', 'jwt-wallet-a');
+    global.__testWallet = { address: ADDRESS_B, token: 'token-wallet-b' };
+    global.__authApi.getMe.mockResolvedValue({ user: { id: 1, address: ADDRESS } });
+    global.__authApi.loginWithNativeAuth.mockResolvedValue({
+      token: 'jwt-wallet-b',
+      user: { id: 2, address: ADDRESS_B },
+    });
+    render(<Tree />);
+    await waitFor(() => expect(textOf('user')).toBe(ADDRESS_B));
+    expect(global.__authApi.loginWithNativeAuth).toHaveBeenCalledTimes(1);
+    expect(global.__authApi.loginWithNativeAuth).toHaveBeenCalledWith('token-wallet-b');
+    expect(global.__providerLogout).not.toHaveBeenCalled();
+    expect(localStorage.getItem('token')).toBe('jwt-wallet-b');
+    expect(global.__authApi.logout).toHaveBeenCalled();
   });
 
   it('restores a valid session without posting Native Auth again', async () => {

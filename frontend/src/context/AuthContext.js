@@ -145,6 +145,21 @@ export function AuthProvider({ children }) {
   }, [address]);
 
   useEffect(() => {
+    if (loading || !user?.address || !address || user.address === address) return undefined;
+    sessionGen.current += 1;
+    clearNativeAuthSession();
+    suppressAutoAuth.current = false;
+    const hadToken = Boolean(localStorage.getItem('token'));
+    if (hadToken) authAPI.logout().catch(() => {});
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    setAuthError(null);
+    setIsAuthenticating(false);
+    return undefined;
+  }, [loading, user, address]);
+
+  useEffect(() => {
     if (loading || user || !address || !nativeAuthToken || suppressAutoAuth.current) {
       return undefined;
     }
@@ -154,6 +169,14 @@ export function AuthProvider({ children }) {
     runNativeAuthLogin(nativeAuthToken, { force: false, request: requestLogin })
       .then((data) => {
         if (!active || sessionGen.current !== gen) return;
+        if (address && data?.user?.address && data.user.address !== address) {
+          clearNativeAuthSession();
+          setAuthError(normalizeAuthError({
+            status: 401,
+            code: 'wallet_mismatch',
+          }));
+          return;
+        }
         persistSession(data, gen);
       })
       .catch((err) => {
