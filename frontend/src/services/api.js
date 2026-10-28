@@ -35,16 +35,26 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+    const retryAfter = error.response?.headers?.['retry-after'];
+    if (status === 401) {
       const isLoginAttempt = error.config?.url?.includes('/auth/login');
       if (!isLoginAttempt) {
-        // Only redirect on 401 for authenticated requests (not during login)
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
       }
     }
-    return Promise.reject(error.response?.data || { error: 'Network error' });
+    const payload = data && typeof data === 'object' && !Array.isArray(data)
+      ? { ...data }
+      : { error: 'Network error' };
+    if (status) payload.status = status;
+    if (retryAfter && payload.retryAfter == null) payload.retryAfter = retryAfter;
+    if (!status && error.code) payload.code = payload.code || error.code;
+    return Promise.reject(payload);
   }
 );
 
@@ -53,7 +63,7 @@ export const authAPI = {
     api.post('/auth/login', { address, signature, message }),
 
   loginWithNativeAuth: (accessToken) =>
-    api.post('/auth/login/native', { accessToken }),
+    api.post('/auth/login/native', { accessToken }, { timeout: 20000 }),
 
   logout: () =>
     api.post('/auth/logout'),

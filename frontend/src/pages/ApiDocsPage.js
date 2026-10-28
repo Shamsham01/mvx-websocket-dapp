@@ -11,6 +11,7 @@ import PageHeader from '../components/ui/PageHeader';
 import SectionCard from '../components/ui/SectionCard';
 import swaggerSpec from '../constants/swaggerSpec';
 import { useAuth } from '../context/AuthContext';
+import { normalizeAuthError } from '../services/nativeAuthSession';
 import { useNotify } from '../context/NotificationContext';
 
 const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
@@ -57,8 +58,8 @@ export default function ApiDocsPage() {
       } else {
         notify('Token generated. Please use Authorize to apply it.');
       }
-    } catch (_) {
-      notify('Unable to generate token. Reconnect wallet and try again.', 'error');
+    } catch (err) {
+      notify(normalizeAuthError(err).message, 'error');
     } finally {
       setIsGeneratingToken(false);
     }

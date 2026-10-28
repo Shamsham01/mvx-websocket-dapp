@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('./services/mvxApiGuard').installMvxApiGuard();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -23,7 +24,8 @@ const PORT = process.env.PORT || 3001;
 app.use(helmet());
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true
+  credentials: true,
+  exposedHeaders: ['Retry-After'],
 }));
 app.use(express.json());
 app.use(morgan('combined', { stream: logger.stream }));
@@ -51,6 +53,7 @@ app.get('/api', (req, res) => {
     version: '1.0.0',
     endpoints: {
       auth: {
+        loginNative: 'POST /api/auth/login/native',
         login: 'POST /api/auth/login',
         logout: 'POST /api/auth/logout',
         me: 'GET /api/auth/me'
