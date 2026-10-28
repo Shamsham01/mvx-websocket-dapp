@@ -63,20 +63,9 @@ function safeSubscriptionError(error) {
   }
 }
 
-/**
- * True only when a packet would be written now.
- * Socket.IO otherwise queues the packet and flushes it on the next connect,
- * before user `connect` listeners run.
- */
-function transportCanSend(socket) {
-  if (!socket || socket.connected !== true) return false;
-  const engine = socket.io && socket.io.engine;
-  if (engine && typeof engine._hasPingExpired === 'function' && engine._hasPingExpired()) {
-    return false;
-  }
-  const transport = engine && engine.transport;
-  if (transport && transport.writable === false) return false;
-  return true;
+/** Connected sockets can take a non-volatile emit. Disconnected emits fill sendBuffer. */
+function socketIsConnected(socket) {
+  return !!(socket && socket.connected === true);
 }
 
 class WebSocketService {
@@ -142,21 +131,6 @@ class WebSocketService {
       pingInterval: 25000
     });
 
-    const rawEmit = socket.emit.bind(socket);
-    // Drop subscribe/unsubscribe while the transport cannot send them.
-    // Calling emit() in that state fills Socket.IO's sendBuffer, which is
-    // flushed on connect before resubscribeShard() and double-registers.
-    socket.emit = (event, ...args) => {
-      if (
-        (event === 'subscribeCustomTransfers' || event === 'unsubscribeCustomTransfers') &&
-        !transportCanSend(socket)
-      ) {
-        if (socket.flags) socket.flags = {};
-        return socket;
-      }
-      return rawEmit(event, ...args);
-    };
-
     const shard = {
       network,
       shardIndex,
@@ -218,22 +192,25 @@ class WebSocketService {
 
   /**
    * Ask the server to register one filter for this connection session.
-   * A local emit is only "requested". NestJS returns `{ status: 'success' }`
-   * as a Socket.IO ack when the room join works. The public docs do not
-   * promise that ack, so a missing ack stays "requested" and is not retried.
-   * Failures arrive on the `error` event (`pattern`, `data`, `error`).
+   * Nothing is emitted while disconnected: Socket.IO would buffer that packet
+   * and flush it before the connect listener, duplicating resubscribeShard().
+   * A connected socket always uses a normal emit. If the transport is not
+   * writable, Socket.IO keeps the packet on the engine write buffer and
+   * flushes it on drain. Volatile emits are not used; those are discarded.
+   * The state stays "requested" only after that emit. A missing ack is left
+   * as requested and is not resent on this session, because a second join
+   * still counts toward the 10-subscription cap. NestJS returns
+   * `{ status: 'success' }` as an ack when the room join works. Failures
+   * arrive on the `error` event (`pattern`, `data`, `error`).
    */
   emitSubscribe(shard, payload, key) {
-    if (!transportCanSend(shard.socket)) return false;
+    if (!socketIsConnected(shard.socket)) return false;
     const current = shard.registrations.get(key);
     if (current && current.sessionId === shard.sessionId) return false;
 
     const sessionId = shard.sessionId;
     shard.registrations.set(key, { state: 'requested', sessionId });
-    const emitter = shard.socket.volatile && typeof shard.socket.volatile.emit === 'function'
-      ? shard.socket.volatile
-      : shard.socket;
-    emitter.emit('subscribeCustomTransfers', payload, (response) => {
+    shard.socket.emit('subscribeCustomTransfers', payload, (response) => {
       const registration = shard.registrations.get(key);
       if (!registration || registration.sessionId !== sessionId) return;
       if (response && response.status === 'success') {
@@ -261,11 +238,8 @@ class WebSocketService {
 
   emitUnsubscribe(shard, payload, key) {
     shard.registrations.delete(key);
-    if (!transportCanSend(shard.socket)) return false;
-    const emitter = shard.socket.volatile && typeof shard.socket.volatile.emit === 'function'
-      ? shard.socket.volatile
-      : shard.socket;
-    emitter.emit('unsubscribeCustomTransfers', payload);
+    if (!socketIsConnected(shard.socket)) return false;
+    shard.socket.emit('unsubscribeCustomTransfers', payload);
     return true;
   }
 

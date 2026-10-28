@@ -1,8 +1,12 @@
-const { io } = require('socket.io-client');
+const { io, Manager } = require('socket.io-client');
 
-jest.mock('socket.io-client', () => ({
-  io: jest.fn(),
-}));
+jest.mock('socket.io-client', () => {
+  const actual = jest.requireActual('socket.io-client');
+  return {
+    ...actual,
+    io: jest.fn(),
+  };
+});
 jest.mock('../config/database', () => ({
   query: jest.fn(),
   tryClaimDelivered: jest.fn().mockResolvedValue(true),
@@ -247,5 +251,78 @@ describe('WebSocket subscription lifecycle', () => {
     expect(limitLogs[0]).not.toContain(secret);
     expect(subscribeCalls(sockets[0])).toHaveLength(1);
     errorSpy.mockRestore();
+  });
+
+  it('queues a subscription when the socket is connected but the transport is not writable', async () => {
+    const manager = new Manager('http://127.0.0.1:9', {
+      autoConnect: false,
+      reconnection: false,
+    });
+    const socket = manager.socket('/ws/subscription');
+    const engine = {
+      writeBuffer: [],
+      sent: [],
+      readyState: 'open',
+      transport: { writable: false },
+      _hasPingExpired() {
+        return false;
+      },
+      write(data) {
+        this.writeBuffer.push(data);
+        this.flush();
+      },
+      flush() {
+        if (this.readyState === 'closed' || !this.transport.writable) return;
+        this.sent.push(...this.writeBuffer);
+        this.writeBuffer = [];
+      },
+    };
+    manager.engine = engine;
+    const packets = [];
+    const originalPacket = socket.packet.bind(socket);
+    socket.packet = (packet) => {
+      packets.push(packet);
+      return originalPacket(packet);
+    };
+    io.mockImplementation(() => socket);
+
+    await websocketService.createSubscription(1, { address: 'erd1queued' }, 'mainnet');
+
+    expect(socket.connected).toBe(false);
+    expect(socket.sendBuffer).toEqual([]);
+    expect(engine.writeBuffer).toEqual([]);
+    expect(packets).toEqual([]);
+
+    socket.connected = true;
+    socket.emitReserved('connect');
+
+    const subscribePackets = () => packets.filter(
+      (packet) => packet.data && packet.data[0] === 'subscribeCustomTransfers'
+    );
+    expect(subscribePackets()).toHaveLength(1);
+    expect(subscribePackets()[0].data[1]).toEqual({ address: 'erd1queued' });
+    expect(socket.sendBuffer).toEqual([]);
+    expect(engine.writeBuffer.length).toBeGreaterThan(0);
+    expect(engine.sent).toEqual([]);
+
+    const shard = websocketService.subscriptions.get(1).shard;
+    const key = [...shard.registrations.keys()][0];
+    expect(shard.registrations.get(key).state).toBe('requested');
+
+    const volatileBefore = packets.length;
+    const bufferedBefore = engine.writeBuffer.length;
+    socket.volatile.emit('subscribeCustomTransfers', { address: 'erd1volatile' });
+    expect(packets).toHaveLength(volatileBefore);
+    expect(engine.writeBuffer).toHaveLength(bufferedBefore);
+
+    engine.transport.writable = true;
+    engine.flush();
+    expect(engine.writeBuffer).toEqual([]);
+    expect(engine.sent.length).toBeGreaterThan(0);
+    expect(subscribePackets()).toHaveLength(1);
+
+    await websocketService.createSubscription(2, { address: 'erd1queued' }, 'mainnet');
+    expect(subscribePackets()).toHaveLength(1);
+    expect(shard.registrations.get(key).state).toBe('requested');
   });
 });
