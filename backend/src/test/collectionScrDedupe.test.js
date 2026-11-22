@@ -11,6 +11,8 @@ jest.mock('../services/tokenMetadata', () => ({
   hydrateSubscriptionFilters: jest.fn(async (subs) => subs),
 }));
 
+const axios = require('axios');
+const { pollUntilConfirmed } = require('../services/confirmationPollingService');
 const database = require('../config/database');
 const webhookService = require('../services/webhookService');
 const websocketService = require('../services/websocketService');
@@ -185,5 +187,89 @@ describe('XOXNO collection listing SCR dedupe', () => {
       `raw|31|${rootTxHash}|collection|pittz-1a4c2d`,
       `raw|32|${rootTxHash}|collection|pittz-1a4c2d`,
     ]);
+  });
+});
+
+describe('OOX bulk purchase collection webhooks', () => {
+  const marketplace = 'erd1qqqqqqqqqqqqqpgqwp73w2a9eyzs64eltupuz3y3hv798vlv899qrjnflg';
+  const buyer = 'erd1x048mkeu4h4a5g8xzr7ap0jaau0k8grvd7wqukca90mrgd8pxs8qqundyh';
+  const bulkBuyHash = 'c958d985a16b043b038033d35952b859516e8c19fd3b0dc32ee8db87db2ef666';
+  const subscription = sub(42, {
+    sender: marketplace,
+    function: 'ESDTNFTTransfer',
+    onlyConfirmed: true,
+    transactionType: 'SmartContractResult',
+    matchTopLevelOnly: true,
+    collectionIdentifier: 'EMP-897b49',
+  });
+  const transfers = [
+    ['07050c24f6c3fbf081460b6f1515ba5ae90ea876095f2caffa0fcaf4f279fc84', 'EMP-897b49-1d3d'],
+    ['49ee956b18292508b33ca7b4650297f99ea7fbe2e4274401c0f0f5a789e19032', 'EMP-897b49-1280'],
+    ['1a2658414737a46cfdfa9ec21be82c9621afc2ca9069c7d9ca07e421f5bc25a6', 'EMP-897b49-1df8'],
+  ].map(([txHash, identifier]) => ({
+    txHash,
+    originalTxHash: bulkBuyHash,
+    type: 'SmartContractResult',
+    sender: marketplace,
+    receiver: buyer,
+    function: 'ESDTNFTTransfer',
+    status: 'success',
+    action: { arguments: { transfers: [{ identifier }] } },
+    operations: [{ type: 'nft', identifier }],
+  }));
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    websocketService.deliveredKeys.clear();
+    database.query.mockResolvedValue([subscription]);
+    const claims = new Set();
+    database.tryClaimDelivered.mockImplementation(async (key) => {
+      if (claims.has(key)) return false;
+      claims.add(key);
+      return true;
+    });
+  });
+
+  it('delivers each SCR once across WebSocket updates, confirmation polls and replays', async () => {
+    axios.get.mockResolvedValue({ data: { status: 'success' } });
+    // One confirmation arrives by WebSocket first, another by poll first.
+    await websocketService.handleTransferUpdate('mainnet', { transfers: transfers.slice(0, 1) });
+    for (const transfer of transfers) {
+      await pollUntilConfirmed(bulkBuyHash, { ...transfer, status: 'pending' }, [subscription], 'mainnet', websocketService);
+    }
+    websocketService.deliveredKeys.clear(); // Restart: only persisted claims remain.
+    await websocketService.handleTransferUpdate('mainnet', { transfers });
+    expect(webhookService.deliverWebhook.mock.calls.map(([, event]) => event.txHash))
+      .toEqual(transfers.map((transfer) => transfer.txHash));
+  });
+
+  it('resolves thin SCRs from the same child hash or unambiguous parent operations', async () => {
+    const [transfer] = transfers;
+    const thin = { ...transfer, action: undefined, operations: [] };
+    const emp = { ...transfer.operations[0], sender: marketplace, receiver: buyer };
+    const other = { ...emp, identifier: 'OTHER-abcdef-01' };
+    const data = Buffer.from('ESDTNFTTransfer@454d502d383937623439@1d3d@01').toString('base64');
+    const parent = {
+      operations: [emp, other],
+      results: [{ hash: transfer.txHash, data }],
+    };
+    const plansFor = (row, parentTransaction) => websocketService.buildDeliveryPlansForTransfer(
+      row, [subscription], 'mainnet', { parentTransaction }
+    );
+    expect((await plansFor(thin, parent)).raw).toHaveLength(1);
+    expect((await plansFor({ ...thin, txHash: 'different-scr' }, parent)).raw).toHaveLength(0);
+    expect((await plansFor(thin, { operations: [emp] })).raw).toHaveLength(1);
+  });
+
+  it('excludes another collection in the same purchase even when the parent contains EMP', async () => {
+    const unrelated = {
+      ...transfers[0],
+      txHash: 'other-collection-scr',
+      action: { arguments: { transfers: [{ identifier: 'OTHER-abcdef-01' }] } },
+      operations: [{ type: 'nft', identifier: 'OTHER-abcdef-01' }],
+    };
+    axios.get.mockResolvedValue({ data: { operations: [...transfers[0].operations, ...unrelated.operations] } });
+    await websocketService.handleTransferUpdate('mainnet', { transfers: [unrelated] });
+    expect(webhookService.deliverWebhook).not.toHaveBeenCalled();
   });
 });

@@ -99,6 +99,46 @@ function transferHasToken(transfer, targetToken, topLevelOnly = false) {
   return false;
 }
 
+// An ESDTNFTTransfer names one asset. Use the SCR's own identity even when
+// its parent contains operations for several different collections.
+function isNftTransferScr(transfer) {
+  return !!transfer?.originalTxHash &&
+    normalizeValue(transferFunctionName(transfer)) === 'esdtnfttransfer';
+}
+
+function nftTransferAsset(transfer) {
+  const asset = transfer?.action?.arguments?.transfers?.[0];
+  const identifier = asset?.identifier || asset?.collection || asset?.token;
+  if (identifier) return normalizeValue(identifier);
+  if (typeof transfer?.data === 'string') {
+    const call = Buffer.from(transfer.data, 'base64').toString();
+    const match = /^ESDTNFTTransfer@((?:[0-9a-f]{2})+)@/i.exec(call);
+    if (match) return normalizeValue(Buffer.from(match[1], 'hex').toString());
+  }
+  const op = transfer?.operations?.find((op) => op?.type === 'nft');
+  return normalizeValue(op?.collection || op?.identifier || op?.tokenIdentifier);
+}
+
+function nftScrMatchesCollection(transfer, target, parent) {
+  const ownAsset = nftTransferAsset(transfer);
+  if (ownAsset) return tokenIdMatches(ownAsset, target);
+
+  const txId = transfer.txHash || transfer.hash;
+  const result = txId && parent?.results?.find((row) => (row?.hash || row?.txHash) === txId);
+  const resultAsset = nftTransferAsset(result);
+  if (resultAsset) return tokenIdMatches(resultAsset, target);
+
+  // Older or thin payloads can have asset metadata only in the parent operations.
+  // These identify the collection only when all candidate NFT legs agree.
+  if (!transfer.sender || !transfer.receiver) return false;
+  const candidates = (parent?.operations || []).filter((op) =>
+    op?.type === 'nft' && op.sender === transfer.sender && op.receiver === transfer.receiver
+  );
+  return candidates.length > 0 && candidates.every((op) =>
+    tokenIdMatches(op.collection || op.identifier || op.tokenIdentifier, target)
+  );
+}
+
 /**
  * Collection on this WebSocket row (action.transfers + operations).
  * topLevelOnly skips nested results[] from a parent buy bundle, not this row's operations.
@@ -361,7 +401,9 @@ function requiresParentAssetContext(transfer, filters) {
 
   if (
     normalizedFilters.collectionIdentifier &&
-    !transferHasCollection(transfer, normalizedFilters.collectionIdentifier, topLevelOnly)
+    (isNftTransferScr(transfer)
+      ? !nftTransferAsset(transfer)
+      : !transferHasCollection(transfer, normalizedFilters.collectionIdentifier, topLevelOnly))
   ) {
     return true;
   }
@@ -441,17 +483,10 @@ function matchesFilters(transfer, filters, options = {}) {
 
   if (normalizedFilters.collectionIdentifier) {
     const target = normalizeValue(normalizedFilters.collectionIdentifier);
-    if (
-      !transferSatisfiesAssetFilter(
-        transfer,
-        transferHasCollection,
-        target,
-        topLevelOnly,
-        parentTransaction
-      )
-    ) {
-      return false;
-    }
+    const matchesCollection = isNftTransferScr(transfer)
+      ? nftScrMatchesCollection(transfer, target, parentTransaction)
+      : transferSatisfiesAssetFilter(transfer, transferHasCollection, target, topLevelOnly, parentTransaction);
+    if (!matchesCollection) return false;
   }
 
   // Amount filters stay on the current row only (do not inherit parent value/token legs).
@@ -479,8 +514,8 @@ function matchesFilters(transfer, filters, options = {}) {
 
 /**
  * Dedupe key for raw (non-classified) webhook delivery.
- * Collection SCR subscriptions use root tx + collection so multi-SCR listing
- * families (user→marketplace transfer + marketplace self-call) produce one webhook.
+ * Each NFT transfer SCR is a separate delivery, including siblings in a bulk buy.
+ * Other collection SCRs retain root-based grouping for marketplace listings.
  */
 function buildRawDeliveryDedupeKey(subscription, transfer, filters) {
   const status = transfer?.status ?? '';
@@ -490,7 +525,8 @@ function buildRawDeliveryDedupeKey(subscription, transfer, filters) {
   const subId = subscription?.id ?? 'unknown';
 
   if (rootHash && collection) {
-    return `raw|${subId}|${rootHash}|collection|${normalizeValue(collection)}`;
+    const deliveryHash = isNftTransferScr(transfer) && txId !== 'unknown' ? txId : rootHash;
+    return `raw|${subId}|${deliveryHash}|collection|${normalizeValue(collection)}`;
   }
   return `raw|${subId}|${txId}|${status}`;
 }

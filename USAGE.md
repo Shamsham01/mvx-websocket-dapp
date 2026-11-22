@@ -288,7 +288,9 @@ Example — track OOX Empyreans listings without receiving every marketplace lis
 
 Row filters (`address`, `function`, `transactionType`, `matchTopLevelOnly`) still apply to the SCR. Only asset filters (`collectionIdentifier`, `tokenIdentifier`) may use the parent as context. The webhook still receives the SCR, not the parent transaction.
 
-**Duplicate listing SCRs:** Marketplace listings often emit more than one SCR under the same `originalTxHash` (for example a user→marketplace NFT transfer SCR, then a marketplace→marketplace async `listing` self-call). MakeX skips contract self-call SCRs (`sender === receiver`) and, for collection subscriptions, deduplicates raw delivery to **one webhook per subscription per root transaction + collection**.
+**Duplicate listing SCRs:** Marketplace listings often emit more than one SCR under the same `originalTxHash` (for example a user→marketplace NFT transfer SCR, then a marketplace→marketplace async `listing` self-call). MakeX skips contract self-call SCRs (`sender === receiver`) and groups listing callbacks by subscription, root transaction and collection.
+
+**Bulk purchases.** A confirmed collection subscription delivers one webhook per matching `ESDTNFTTransfer` SCR. A bulk purchase that sends three NFTs from your collection in three SCRs produces three webhooks. Each payload carries the individual transfer hash and the shared `originalTxHash`. MakeX checks the collection on the transfer or its corresponding result. When only parent operations identify the assets, all NFT transfers between the same sender and receiver must agree on the collection.
 
 ## 📡 WebSocket Data Flow — Simple Model
 
